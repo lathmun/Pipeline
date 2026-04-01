@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Setup Checklist</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #f0f4f8; }
+    h1 { text-align: center; margin-bottom: 10px; color: #2c3e50; }
+    p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+    .checklist { background: #fff; padding: 25px 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .section { margin-bottom: 20px; }
+    .section h2 { font-size: 16px; color: #2980b9; margin-bottom: 10px; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
+    .check-item { display: flex; align-items: flex-start; margin-bottom: 8px; padding: 6px 0; }
+    .check-item input[type="checkbox"] { margin-right: 10px; margin-top: 3px; transform: scale(1.2); }
+    .check-item label { color: #333; line-height: 1.4; cursor: pointer; }
+    .check-item input:checked + label { text-decoration: line-through; color: #95a5a6; }
+    button#save-btn { display: block; margin: 20px auto 0; padding: 10px 30px; background: #27ae60; color: #fff; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; }
+    button#save-btn:hover { background: #219a52; }
+    .saved-msg { text-align: center; color: #27ae60; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>Pipeline Deployment Checklist</h1>
+  <p class="subtitle">Track your progress setting up the CI/CD pipeline</p>
+
+  <div class="checklist">
+    <div class="section">
+      <h2>1. Repository Setup</h2>
+      <div class="check-item">
+        <input type="checkbox" id="c1"><label for="c1">Initialize Git repository</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c2"><label for="c2">Create <code>master</code> branch</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c3"><label for="c3">Create <code>test</code> branch from master</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c4"><label for="c4">Push repository to GitHub</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Branch Protection Rules</h2>
+      <div class="check-item">
+        <input type="checkbox" id="c5"><label for="c5">Protect <code>master</code> branch — disable direct push</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c6"><label for="c6">Require PR reviews before merging to master</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c7"><label for="c7">Require status checks (tests) to pass before merging</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. CI/CD Pipeline</h2>
+      <div class="check-item">
+        <input type="checkbox" id="c8"><label for="c8">Add GitHub Actions workflow for <code>test</code> branch</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c9"><label for="c9">Add GitHub Actions workflow for PRs to <code>master</code></label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c10"><label for="c10">Verify tests run automatically on push to test branch</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c11"><label for="c11">Verify auto-deploy to test server after tests pass</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Server Configuration</h2>
+      <div class="check-item">
+        <input type="checkbox" id="c12"><label for="c12">Set up test server (VM, container, etc.)</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c13"><label for="c13">Install Node.js on test server</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c14"><label for="c14">Configure process manager (pm2 or similar)</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c15"><label for="c15">Add deployment secrets to GitHub repo settings</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Testing & Verification</h2>
+      <div class="check-item">
+        <input type="checkbox" id="c16"><label for="c16">Push a change to <code>test</code> branch</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c17"><label for="c17">Confirm all tests pass in GitHub Actions</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c18"><label for="c18">Confirm app deployed to test server successfully</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c19"><label for="c19">Manually test app on test server</label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c20"><label for="c20">Create PR from <code>test</code> to <code>master</code></label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c21"><label for="c21">Merge PR after approval and tests pass</label>
+      </div>
+    </div>
+
+    <button id="save-btn">Save Progress</button>
+    <p class="saved-msg" id="saved-msg">✓ Progress saved!</p>
+  </div>
+
+  <script>
+    // Load saved state
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const saved = JSON.parse(localStorage.getItem('pipeline-checklist') || '{}');
+    checkboxes.forEach(cb => {
+      if (saved[cb.id]) cb.checked = true;
+    });
+
+    // Save state
+    document.getElementById('save-btn').addEventListener('click', () => {
+      const state = {};
+      checkboxes.forEach(cb => { state[cb.id] = cb.checked; });
+      localStorage.setItem('pipeline-checklist', JSON.stringify(state));
+      const msg = document.getElementById('saved-msg');
+      msg.style.display = 'block';
+      setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    });
+  </script>
+</body>
+</html>
