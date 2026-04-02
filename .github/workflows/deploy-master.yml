@@ -1,0 +1,97 @@
+# =============================================================================
+# CI/CD PIPELINE — DEPLOY MASTER
+# =============================================================================
+#
+# WHAT DOES THIS PIPELINE DO?
+#   Triggers when code is pushed to `master` (i.e., after a PR is merged).
+#   Runs tests one final time, then deploys to /var/www/pipelinemaster on the server.
+#
+# WHY A SEPARATE PATH?
+#   - /var/www/pipeline       → test branch deployment (for testing)
+#   - /var/www/pipelinemaster → master branch deployment (stable/verified code)
+#
+#   This way both versions can run side-by-side on the same server.
+#   Test runs on port 3000, master runs on port 3001.
+# =============================================================================
+
+name: Deploy Master
+
+# Triggers when code is pushed to master.
+# Since direct pushes are blocked by branch protection,
+# this only fires when a PR is merged into master.
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  # Run tests one final time as a safety net
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # Deploy to /var/www/pipelinemaster on the server
+  deploy-master:
+    name: Deploy Master to Server
+    needs: test
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+
+      - name: Deploy to master path on server
+        env:
+          TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
+          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
+          TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
+        run: |
+          echo "Deploying master to /var/www/pipelinemaster..."
+
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $TEST_SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Ensure the master directory exists on the server
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+            "mkdir -p /var/www/pipelinemaster"
+
+          # Rsync app files to /var/www/pipelinemaster/
+          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipelinemaster/
+
+          # Install deps and start/restart the app on port 3001
+          # Uses pm2 with name "pipelinemaster" to differentiate from the test instance
+          # PORT=3001 so it doesn't conflict with the test deploy on port 3000
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 restart pipelinemaster || PORT=3001 pm2 start src/server.js --name pipelinemaster)"
+
+          echo "✅ Master deployed to /var/www/pipelinemaster (port 3001)"
