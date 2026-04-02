@@ -6,16 +6,19 @@
   <title>Pipeline Setup Checklist</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #f0f4f8; }
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f0f4f8; }
     h1 { text-align: center; margin-bottom: 10px; color: #2c3e50; }
     p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
     .checklist { background: #fff; padding: 25px 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .section { margin-bottom: 20px; }
+    .section { margin-bottom: 28px; }
     .section h2 { font-size: 16px; color: #2980b9; margin-bottom: 10px; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
-    .check-item { display: flex; align-items: flex-start; margin-bottom: 8px; padding: 6px 0; }
-    .check-item input[type="checkbox"] { margin-right: 10px; margin-top: 3px; transform: scale(1.2); }
+    .section-desc { color: #666; font-size: 13px; margin-bottom: 12px; line-height: 1.5; background: #f8f9fa; padding: 10px 12px; border-left: 3px solid #3498db; border-radius: 0 4px 4px 0; }
+    .check-item { display: flex; align-items: flex-start; margin-bottom: 4px; padding: 6px 0; }
+    .check-item input[type="checkbox"] { margin-right: 10px; margin-top: 3px; transform: scale(1.2); flex-shrink: 0; }
     .check-item label { color: #333; line-height: 1.4; cursor: pointer; }
     .check-item input:checked + label { text-decoration: line-through; color: #95a5a6; }
+    .step-hint { display: block; font-size: 12px; color: #888; margin-top: 2px; font-style: italic; }
+    .cmd { background: #2c3e50; color: #2ecc71; padding: 10px 14px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px; margin: 8px 0; overflow-x: auto; white-space: pre; display: block; line-height: 1.6; }
     button#save-btn { display: block; margin: 20px auto 0; padding: 10px 30px; background: #27ae60; color: #fff; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; }
     button#save-btn:hover { background: #219a52; }
     .saved-msg { text-align: center; color: #27ae60; margin-top: 10px; display: none; }
@@ -25,87 +28,282 @@
   <h1>Pipeline Deployment Checklist</h1>
   <p class="subtitle">Track your progress setting up the CI/CD pipeline</p>
 
+  <!-- ========== PROGRESS STATUS ========== -->
+  <div style="background:#fff3cd; border:1px solid #ffc107; padding:15px 18px; border-radius:8px; margin-bottom:20px; font-size:14px; line-height:1.6;">
+    <strong>⏸️ PAUSED — Waiting for a TEST server</strong><br><br>
+    <strong>What's done:</strong><br>
+    ✅ Sections 1-3: Repo, branches, protection rules, CI/CD workflows — all complete<br>
+    ✅ Section 4: Node.js + pm2 installed on PROD droplet (but we won't deploy there)<br>
+    ✅ Section 5: Deploy SSH key created (~/.ssh/deploy_key) and tested on PROD droplet<br><br>
+    <strong>Why we stopped:</strong><br>
+    ⚠️ The current DigitalOcean droplet is a <strong>PRODUCTION</strong> server.<br>
+    Deploying test code to production is risky — a bug could break the live app.<br>
+    You should NOT put production server SSH keys in a public GitHub repo's secrets.<br><br>
+    <strong>What you need to do:</strong><br>
+    1. Create a <strong>separate test droplet</strong> on DigitalOcean ($4-6/month)<br>
+    2. Come back here and resume from <strong>Section 4</strong> using the NEW test server IP<br>
+    3. The deploy key (~/.ssh/deploy_key) already exists — just copy it to the new server<br><br>
+    <strong>Resume command:</strong><br>
+    <code>ssh-copy-id -i ~/.ssh/deploy_key.pub root@NEW_TEST_SERVER_IP</code>
+  </div>
+
   <div class="checklist">
+
+    <!-- ========== SECTION 1: REPOSITORY SETUP ========== -->
     <div class="section">
-      <h2>1. Repository Setup</h2>
-      <div class="check-item">
-        <input type="checkbox" id="c1"><label for="c1">Initialize Git repository</label>
+      <h2>1. Repository Setup ✅ DONE</h2>
+      <div class="section-desc">
+        You've already done this! Your code is on GitHub with <code>master</code> and <code>test</code> branches.
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c2"><label for="c2">Create <code>master</code> branch</label>
+        <input type="checkbox" id="c1"><label for="c1">Initialize Git repository<span class="step-hint">git init</span></label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c3"><label for="c3">Create <code>test</code> branch from master</label>
+        <input type="checkbox" id="c2"><label for="c2">Create <code>master</code> branch<span class="step-hint">git branch -M master</span></label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c4"><label for="c4">Push repository to GitHub</label>
+        <input type="checkbox" id="c3"><label for="c3">Create <code>test</code> branch from master<span class="step-hint">git checkout -b test</span></label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c4"><label for="c4">Push both branches to GitHub<span class="step-hint">git push -u origin master && git push -u origin test</span></label>
       </div>
     </div>
 
+    <!-- ========== SECTION 2: BRANCH PROTECTION ========== -->
     <div class="section">
-      <h2>2. Branch Protection Rules</h2>
-      <div class="check-item">
-        <input type="checkbox" id="c5"><label for="c5">Protect <code>master</code> branch — disable direct push</label>
+      <h2>2. Branch Protection Rules ✅ DONE</h2>
+      <div class="section-desc">
+        You've set up rulesets on GitHub. This prevents anyone from pushing directly to <code>master</code>.
+        All changes must go through a PR from the <code>test</code> branch.
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c6"><label for="c6">Require PR reviews before merging to master</label>
+        <input type="checkbox" id="c5"><label for="c5">Protect <code>master</code> branch — disable direct push<span class="step-hint">GitHub → Settings → Rules → Rulesets → Add "master" as target</span></label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c6"><label for="c6">Require PR before merging to master</label>
       </div>
       <div class="check-item">
         <input type="checkbox" id="c7"><label for="c7">Require status checks (tests) to pass before merging</label>
       </div>
     </div>
 
+    <!-- ========== SECTION 3: CI/CD PIPELINE ========== -->
     <div class="section">
-      <h2>3. CI/CD Pipeline</h2>
-      <div class="check-item">
-        <input type="checkbox" id="c8"><label for="c8">Add GitHub Actions workflow for <code>test</code> branch</label>
+      <h2>3. CI/CD Pipeline ✅ DONE</h2>
+      <div class="section-desc">
+        The workflow files are already in <code>.github/workflows/</code>. GitHub detects them automatically.
+        When you push to <code>test</code>, GitHub runs the tests. When you open a PR to <code>master</code>, tests run again.
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c9"><label for="c9">Add GitHub Actions workflow for PRs to <code>master</code></label>
+        <input type="checkbox" id="c8"><label for="c8">Add GitHub Actions workflow for <code>test</code> branch<span class="step-hint">File: .github/workflows/test-branch.yml</span></label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c10"><label for="c10">Verify tests run automatically on push to test branch</label>
+        <input type="checkbox" id="c9"><label for="c9">Add GitHub Actions workflow for PRs to <code>master</code><span class="step-hint">File: .github/workflows/pr-master.yml</span></label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c11"><label for="c11">Verify auto-deploy to test server after tests pass</label>
+        <input type="checkbox" id="c10"><label for="c10">Push to test branch and verify tests run in GitHub Actions tab</label>
       </div>
     </div>
 
+    <!-- ========== SECTION 4: DIGITALOCEAN SERVER SETUP ========== -->
     <div class="section">
-      <h2>4. Server Configuration</h2>
-      <div class="check-item">
-        <input type="checkbox" id="c12"><label for="c12">Set up test server (VM, container, etc.)</label>
+      <h2>4. DigitalOcean Droplet Setup — ⏸️ REDO ON TEST SERVER</h2>
+      <div class="section-desc">
+        <strong>Goal:</strong> Prepare your DigitalOcean <strong>TEST</strong> droplet so the pipeline can deploy to it.<br>
+        You need to SSH into your droplet and install Node.js + pm2 (a process manager that keeps your app running).<br><br>
+        <strong>⚠️ NOTE:</strong> You already did this on your PROD server. When you create a new test droplet,
+        repeat these same steps on the NEW test server. Do NOT use your production server for pipeline deployments.
       </div>
+
       <div class="check-item">
-        <input type="checkbox" id="c13"><label for="c13">Install Node.js on test server</label>
+        <input type="checkbox" id="c12"><label for="c12">
+          SSH into your droplet
+          <span class="step-hint">Open your terminal and run the command below. Replace YOUR_DROPLET_IP with your actual droplet IP address.</span>
+        </label>
       </div>
+      <code class="cmd">ssh root@YOUR_DROPLET_IP</code>
+
       <div class="check-item">
-        <input type="checkbox" id="c14"><label for="c14">Configure process manager (pm2 or similar)</label>
+        <input type="checkbox" id="c13"><label for="c13">
+          Install Node.js 20 on the droplet
+          <span class="step-hint">Run these commands inside your droplet (after SSH). This installs Node.js from the official source.</span>
+        </label>
       </div>
+      <code class="cmd">curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+node --version   # Should show v20.x.x</code>
+
       <div class="check-item">
-        <input type="checkbox" id="c15"><label for="c15">Add deployment secrets to GitHub repo settings</label>
+        <input type="checkbox" id="c14"><label for="c14">
+          Install pm2 (process manager)
+          <span class="step-hint">pm2 keeps your Node.js app running 24/7 and auto-restarts it if it crashes.</span>
+        </label>
       </div>
+      <code class="cmd">npm install -g pm2</code>
+
+      <div class="check-item">
+        <input type="checkbox" id="c15"><label for="c15">
+          Create the app directory on the droplet
+          <span class="step-hint">This is where your app files will be deployed to.</span>
+        </label>
+      </div>
+      <code class="cmd">mkdir -p /var/www/pipeline</code>
     </div>
 
+    <!-- ========== SECTION 5: CREATE DEPLOY SSH KEY ========== -->
     <div class="section">
-      <h2>5. Testing & Verification</h2>
+      <h2>5. Deploy SSH Key — ✅ KEY EXISTS, copy to test server</h2>
+      <div class="section-desc">
+        <strong>Why?</strong> GitHub Actions needs a way to log into your droplet without a password.
+        SSH keys work like a lock-and-key system: the <em>public key</em> goes on your server (the lock),
+        and the <em>private key</em> goes into GitHub Secrets (the key). When the pipeline runs,
+        it uses the private key to prove its identity to your server.<br><br>
+        <strong>✅ Key already created:</strong> The deploy key pair already exists at <code>~/.ssh/deploy_key</code>
+        on your Mac. You do NOT need to generate a new one. Just copy it to your new test server.
+      </div>
+
       <div class="check-item">
-        <input type="checkbox" id="c16"><label for="c16">Push a change to <code>test</code> branch</label>
+        <input type="checkbox" id="c16"><label for="c16">
+          ✅ DONE — Generate SSH key pair on your Mac
+          <span class="step-hint">Already exists at ~/.ssh/deploy_key and ~/.ssh/deploy_key.pub</span>
+        </label>
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c17"><label for="c17">
+          Copy the PUBLIC key to your NEW TEST droplet
+          <span class="step-hint">This is the easiest way — does it automatically. Replace NEW_TEST_IP with your test server IP.</span>
+        </label>
+      </div>
+      <code class="cmd"># Run this from your Mac — copies the key automatically:
+ssh-copy-id -i ~/.ssh/deploy_key.pub root@NEW_TEST_IP</code>
+
+      <div class="check-item">
+        <input type="checkbox" id="c18"><label for="c18">
+          Verify you can SSH into the TEST server using the deploy key
+          <span class="step-hint">Run from your Mac. If you get a shell prompt, it works!</span>
+        </label>
+      </div>
+      <code class="cmd">ssh -i ~/.ssh/deploy_key root@NEW_TEST_IP
+# If you get a shell prompt, it works! Type 'exit' to disconnect.</code>
+    </div>
+
+    <!-- ========== SECTION 6: ADD SECRETS TO GITHUB ========== -->
+    <div class="section">
+      <h2>6. Add Secrets to GitHub</h2>
+      <div class="section-desc">
+        <strong>Why?</strong> Your pipeline needs the server IP, username, and SSH key to deploy.
+        You NEVER put these in code. GitHub Secrets encrypts them and makes them available
+        to your workflow as <code>${{ secrets.NAME }}</code> variables.<br><br>
+        <strong>Where:</strong> GitHub → Your Repo → Settings → Secrets and variables → Actions → New repository secret
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c19"><label for="c19">
+          Add secret: <code>TEST_SERVER_HOST</code>
+          <span class="step-hint">Value = your TEST droplet IP address (NOT your production IP!)</span>
+        </label>
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c20"><label for="c20">
+          Add secret: <code>TEST_SERVER_USER</code>
+          <span class="step-hint">Value = root (or whatever user you SSH in as)</span>
+        </label>
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c21"><label for="c21">
+          Add secret: <code>TEST_SERVER_SSH_KEY</code>
+          <span class="step-hint">Value = the PRIVATE key content. Get it by running: cat ~/.ssh/deploy_key</span>
+        </label>
+      </div>
+      <code class="cmd"># Run this on your Mac to copy the private key:
+cat ~/.ssh/deploy_key
+
+# Copy the ENTIRE output including:
+# -----BEGIN OPENSSH PRIVATE KEY-----
+# ... (key content) ...
+# -----END OPENSSH PRIVATE KEY-----
+# Paste it as the secret value on GitHub.</code>
+    </div>
+
+    <!-- ========== SECTION 7: PUSH & TRIGGER PIPELINE ========== -->
+    <div class="section">
+      <h2>7. Push & Trigger the Pipeline — ✅ Deploy commands already active</h2>
+      <div class="section-desc">
+        <strong>Good news:</strong> The deploy commands in <code>test-branch.yml</code> are already uncommented and active.
+        Once you've added the GitHub Secrets (step 6), just push to the <code>test</code> branch and the pipeline
+        will automatically:<br>
+        1. Run all tests<br>
+        2. If tests pass → SSH into your test droplet<br>
+        3. Copy your app files via rsync<br>
+        4. Install dependencies and start/restart the app with pm2
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c22"><label for="c22">
+          ✅ DONE — Deploy commands are already uncommented in test-branch.yml
+        </label>
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c23"><label for="c23">
+          Commit and push any changes to <code>test</code> branch to trigger the pipeline
+        </label>
+      </div>
+      <code class="cmd">git checkout test
+git add .
+git commit -m "Trigger pipeline deployment"
+git push origin test</code>
+    </div>
+
+    <!-- ========== SECTION 8: TEST THE FULL FLOW ========== -->
+    <div class="section">
+      <h2>8. Test the Full Pipeline Flow</h2>
+      <div class="section-desc">
+        Now test the entire workflow end-to-end. Push a change to <code>test</code>,
+        watch it deploy, test manually on your server, then create a PR to <code>master</code>.
+      </div>
+
+      <div class="check-item">
+        <input type="checkbox" id="c24"><label for="c24">
+          Push a code change to <code>test</code> branch
+        </label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c17"><label for="c17">Confirm all tests pass in GitHub Actions</label>
+        <input type="checkbox" id="c25"><label for="c25">
+          Go to GitHub → Actions tab → watch the pipeline run
+          <span class="step-hint">You'll see "Run Tests" job, then "Deploy to Test Server" job</span>
+        </label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c18"><label for="c18">Confirm app deployed to test server successfully</label>
+        <input type="checkbox" id="c26"><label for="c26">
+          Visit your app on the TEST droplet: <code>http://NEW_TEST_IP:3000</code>
+          <span class="step-hint">You should see the Items Manager login page (user: admin, pass: password123)</span>
+        </label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c19"><label for="c19">Manually test app on test server</label>
+        <input type="checkbox" id="c27"><label for="c27">
+          Login and verify the app works (add/edit/delete items)
+        </label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c20"><label for="c20">Create PR from <code>test</code> to <code>master</code></label>
+        <input type="checkbox" id="c28"><label for="c28">
+          Create a Pull Request: <code>test</code> → <code>master</code> on GitHub
+          <span class="step-hint">GitHub → Pull Requests → New → base: master, compare: test</span>
+        </label>
       </div>
       <div class="check-item">
-        <input type="checkbox" id="c21"><label for="c21">Merge PR after approval and tests pass</label>
+        <input type="checkbox" id="c29"><label for="c29">
+          Verify PR tests pass (green checkmark on PR page)
+        </label>
+      </div>
+      <div class="check-item">
+        <input type="checkbox" id="c30"><label for="c30">
+          Merge the PR 🎉
+          <span class="step-hint">Click "Merge pull request" on GitHub — you've completed the full pipeline!</span>
+        </label>
       </div>
     </div>
 
