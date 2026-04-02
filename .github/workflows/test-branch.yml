@@ -143,7 +143,9 @@ jobs:
       #      - TEST_SERVER_USER  (e.g., deploy)
       #      - TEST_SERVER_SSH_KEY (the private SSH key for authentication)
       #
-      # Secrets are encrypted and never shown in logs.
+      # GitHub masks secret values in logs on a best-effort basis, but masking
+      # is NOT a guarantee — partial or transformed values can still leak.
+      # NEVER echo or log secrets intentionally.
       - name: Deploy to test server
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
@@ -161,7 +163,8 @@ jobs:
 
           # Step B: Write the SSH private key from GitHub Secrets to a file
           # The runner is a fresh VM each time — nothing persists between runs
-          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+          # printf '%s' writes the exact bytes without mangling newlines or escape sequences
+          printf '%s' "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
 
           # Step C: Set strict permissions (SSH refuses keys with open permissions)
           chmod 600 ~/.ssh/deploy_key
@@ -169,7 +172,12 @@ jobs:
           # Step D: Add the server to known_hosts so SSH doesn't prompt "are you sure?"
           ssh-keyscan -H $TEST_SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
 
-          # Step E: Use rsync to copy app files to the DigitalOcean droplet
+          # Step E: Ensure the deployment directory exists on the server
+          # -p flag means: don't error if it already exists
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+            "mkdir -p /var/www/pipeline"
+
+          # Step F: Use rsync to copy app files to the DigitalOcean droplet
           # rsync only transfers CHANGED files (fast after first deploy)
           #   -a = archive mode (preserves permissions, timestamps)
           #   -v = verbose (shows what's being transferred — visible in Actions logs)

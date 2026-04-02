@@ -32,7 +32,15 @@ const path = require('path');
 const versionFile = path.join(__dirname, '..', 'public', 'version.json');
 
 // Read the current version.json file and parse it as JSON
-const versionData = JSON.parse(fs.readFileSync(versionFile, 'utf-8'));
+let versionData;
+try {
+  versionData = JSON.parse(fs.readFileSync(versionFile, 'utf-8'));
+} catch (err) {
+  console.error('❌ Could not read or parse public/version.json');
+  console.error('Make sure the file exists and contains valid JSON.');
+  console.error('Example: {"version": "1.0.0", "date": "2026-01-01", "time": "12:00:00", "timestamp": "2026-01-01T12:00:00Z"}');
+  process.exit(1);
+}
 
 // Get the bump type from command line argument (default: patch)
 // process.argv[0] = "node", process.argv[1] = "script.js", process.argv[2] = the argument
@@ -40,6 +48,20 @@ const bumpType = process.argv[2] || 'patch';
 
 // Split the version string "1.0.0" into three numbers [1, 0, 0]
 const parts = versionData.version.split('.').map(Number);
+
+// Validate version format — must be exactly 3 numeric parts
+if (parts.length !== 3 || parts.some(isNaN)) {
+  console.error(`❌ Invalid version format in version.json: "${versionData.version}"`);
+  console.error('Expected format: "X.Y.Z" (e.g., "1.0.0")');
+  process.exit(1);
+}
+
+// Validate bump type — only patch, minor, major are allowed
+if (!['patch', 'minor', 'major'].includes(bumpType)) {
+  console.error(`❌ Unknown bump type: "${bumpType}"`);
+  console.error('Usage: node scripts/bump-version.js [patch|minor|major]');
+  process.exit(1);
+}
 
 // Bump the appropriate part based on the argument
 if (bumpType === 'major') {

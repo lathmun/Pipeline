@@ -100,7 +100,9 @@ jobs:
       - name: Deploy to master path on server
         # "env" — Makes these values available as environment variables in the shell
         # ${{ secrets.XXX }} — Reads encrypted values from GitHub Secrets
-        # These are NEVER printed in logs, even if you echo them
+        # GitHub masks secret values in logs on a best-effort basis, but masking
+        # is NOT a guarantee — partial or transformed values can still leak.
+        # NEVER echo or log secrets intentionally.
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}    # Server IP address
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}    # SSH username (root)
@@ -115,7 +117,8 @@ jobs:
 
           # Write the private SSH key from GitHub Secrets into a file
           # This key matches the public key we added to the server's authorized_keys
-          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+          # printf '%s' writes the exact bytes without mangling newlines or escape sequences
+          printf '%s' "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
 
           # Set file permissions to 600 (owner read/write only)
           # SSH REQUIRES this — it refuses to use keys with loose permissions
