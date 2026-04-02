@@ -46,6 +46,24 @@ try {
 // process.argv[0] = "node", process.argv[1] = "script.js", process.argv[2] = the argument
 const bumpType = process.argv[2] || 'patch';
 
+// Show help if --help or -h is passed
+if (bumpType === '--help' || bumpType === '-h') {
+  console.log('Usage: node scripts/bump-version.js [patch|minor|major]');
+  console.log('');
+  console.log('Bump types:');
+  console.log('  patch   1.0.0 → 1.0.1   (bug fixes, small changes)');
+  console.log('  minor   1.0.0 → 1.1.0   (new features, no breaking changes)');
+  console.log('  major   1.0.0 → 2.0.0   (breaking changes)');
+  console.log('');
+  console.log('npm shortcuts:');
+  console.log('  npm run bump:patch');
+  console.log('  npm run bump:minor');
+  console.log('  npm run bump:major');
+  console.log('');
+  console.log('If no type is given, defaults to "patch".');
+  process.exit(0);
+}
+
 // Split the version string "1.0.0" into three numbers [1, 0, 0]
 const parts = versionData.version.split('.').map(Number);
 
