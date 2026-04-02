@@ -45,27 +45,41 @@ on:
 # =============================================================================
 jobs:
   test:
-    name: Run Tests
-    runs-on: ubuntu-latest
+    name: Run Tests  # Label shown in GitHub Actions UI and on the PR checks
+    runs-on: ubuntu-latest  # Use a fresh Ubuntu VM as the runner
 
     steps:
-      # Clone the PR's code (GitHub automatically merges the PR branch
-      # with the target branch so tests run against the merged result).
+      # Clone the PR's code onto the runner.
+      # GitHub automatically creates a temporary merge of the PR branch with master,
+      # so tests run against the MERGED result — not just the PR branch alone.
+      # This catches conflicts or issues that only appear after merging.
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4  # Official GitHub action to clone the repo
 
+      # Install Node.js on the runner
+      # node-version: '20' — matches what's on our server for consistency
+      # cache: 'npm' — caches the npm package cache between runs for speed
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '20'  # Use Node.js version 20 (LTS)
+          cache: 'npm'        # Cache ~/.npm directory to speed up installs
 
+      # Install ALL dependencies (including devDependencies like jest & supertest)
+      # npm ci = "clean install" — uses exact versions from package-lock.json
+      # This ensures the test environment matches exactly what other developers have
       - name: Install dependencies
-        run: npm ci
+        run: npm ci  # Faster and more reliable than "npm install" in CI
 
-      # If this step fails, GitHub shows a red X on the PR.
-      # With branch protection enabled, the "Merge" button will be
-      # disabled until tests pass — preventing broken code from
-      # reaching master
+      # Run the full test suite.
+      # If ANY test fails:
+      #   - This step exits with a non-zero code
+      #   - The job is marked as failed
+      #   - GitHub shows a red X ❌ on the PR page
+      #   - With branch protection enabled, the "Merge" button stays DISABLED
+      #   - No one can merge broken code into master
+      # If ALL tests pass:
+      #   - GitHub shows a green checkmark ✅ on the PR page
+      #   - The "Merge" button becomes clickable
       - name: Run tests
         run: npm test

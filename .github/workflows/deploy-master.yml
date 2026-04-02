@@ -7,90 +7,165 @@
 #   Runs tests one final time, then deploys to /var/www/pipelinemaster on the server.
 #
 # WHY A SEPARATE PATH?
-#   - /var/www/pipeline       → test branch deployment (for testing)
-#   - /var/www/pipelinemaster → master branch deployment (stable/verified code)
+#   - /var/www/pipeline       → test branch deployment (staging, for testing)
+#   - /var/www/pipelinemaster → master branch deployment (stable, verified code)
 #
-#   This way both versions can run side-by-side on the same server.
-#   Test runs on port 3000, master runs on port 3001.
+#   This way both versions can run side-by-side on the same server:
+#     staging.mytown-online.de → port 3000 (test branch)
+#     stable.mytown-online.de  → port 3001 (master branch)
+#
+# FLOW:
+#   PR merged into master → this workflow triggers → tests run →
+#   if pass → deploy to /var/www/pipelinemaster on port 3001
 # =============================================================================
 
+# "name" — Human-readable label shown in the GitHub Actions tab.
 name: Deploy Master
 
-# Triggers when code is pushed to master.
-# Since direct pushes are blocked by branch protection,
-# this only fires when a PR is merged into master.
+# =============================================================================
+# TRIGGER: Push to master
+# =============================================================================
+# "on: push" — Fires when commits are pushed to the specified branch.
+# Since direct pushes to master are blocked by branch protection rules,
+# this ONLY triggers when a Pull Request is merged into master.
+# Merging a PR creates a "merge commit" which counts as a push.
 on:
   push:
     branches:
-      - master
+      - master  # Only fires for the master branch
 
+# =============================================================================
+# JOBS
+# =============================================================================
 jobs:
-  # Run tests one final time as a safety net
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
+  # ---------------------------------------------------------------------------
+  # JOB 1: TEST — Final safety net before deploying stable code
+  # ---------------------------------------------------------------------------
+  # Why test again? Even though the PR ran tests, the merge commit could
+  # introduce issues. This is a belt-and-suspenders approach.
+  test:
+    name: Run Tests  # Label shown in GitHub Actions UI
+    runs-on: ubuntu-latest  # Use a fresh Ubuntu VM as the runner
+
+    steps:
+      # Clone the master branch code onto the runner
+      - name: Checkout code
+        uses: actions/checkout@v4  # Official GitHub action to clone the repo
+
+      # Install the specific Node.js version we need
+      # cache: 'npm' speeds up future runs by caching downloaded packages
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '20'  # Match the version on our server
+          cache: 'npm'        # Cache ~/.npm directory between workflow runs
 
+      # Install all dependencies (including devDependencies like jest)
+      # npm ci = clean install from package-lock.json (fast, deterministic)
       - name: Install dependencies
         run: npm ci
 
+      # Run the test suite — if ANY test fails, the job fails
+      # and the deploy job below will NOT execute
       - name: Run tests
         run: npm test
 
-  # Deploy to /var/www/pipelinemaster on the server
+  # ---------------------------------------------------------------------------
+  # JOB 2: DEPLOY — Push stable code to /var/www/pipelinemaster
+  # ---------------------------------------------------------------------------
   deploy-master:
-    name: Deploy Master to Server
+    name: Deploy Master to Server  # Label in GitHub Actions UI
+
+    # "needs: test" — Wait for the test job to complete before starting.
+    # This creates a dependency chain: test must pass → then deploy runs.
     needs: test
-    runs-on: ubuntu-latest
+
+    runs-on: ubuntu-latest  # Fresh Ubuntu VM for the deploy job
+
+    # "if: success()" — Only run if ALL jobs in "needs" passed.
+    # If tests failed, this entire job is skipped.
     if: success()
 
     steps:
+      # Clone the code again (each job gets a fresh VM with empty filesystem)
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Install Node.js (needed for npm ci in the next step)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
+      # Install ONLY production dependencies — skip devDependencies (jest, etc.)
+      # --omit=dev means: don't install packages from "devDependencies" in package.json
+      # Why? The server doesn't need test tools — only the app code and its runtime deps
       - name: Install production dependencies
         run: npm ci --omit=dev
 
+      # The main deployment step — connects to the server via SSH and copies files
       - name: Deploy to master path on server
+        # "env" — Makes these values available as environment variables in the shell
+        # ${{ secrets.XXX }} — Reads encrypted values from GitHub Secrets
+        # These are NEVER printed in logs, even if you echo them
         env:
-          TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
-          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
-          TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}    # Server IP address
+          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}    # SSH username (root)
+          TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}  # SSH private key
         run: |
           echo "Deploying master to /var/www/pipelinemaster..."
 
-          # Setup SSH key
+          # --- SSH KEY SETUP ---
+
+          # Create the .ssh directory on the runner (fresh VM, doesn't exist yet)
           mkdir -p ~/.ssh
+
+          # Write the private SSH key from GitHub Secrets into a file
+          # This key matches the public key we added to the server's authorized_keys
           echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+
+          # Set file permissions to 600 (owner read/write only)
+          # SSH REQUIRES this — it refuses to use keys with loose permissions
           chmod 600 ~/.ssh/deploy_key
+
+          # Add the server's fingerprint to known_hosts
+          # Without this, SSH would prompt "Are you sure you want to connect?" and hang
+          # 2>/dev/null suppresses the informational output from ssh-keyscan
           ssh-keyscan -H $TEST_SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
 
-          # Ensure the master directory exists on the server
+          # --- PREPARE SERVER ---
+
+          # Create the deployment directory on the server if it doesn't exist
+          # -p flag means: don't error if directory already exists
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
             "mkdir -p /var/www/pipelinemaster"
 
-          # Rsync app files to /var/www/pipelinemaster/
+          # --- COPY FILES TO SERVER ---
+
+          # rsync copies files from the runner to the server over SSH
+          # It only transfers files that CHANGED (much faster than copying everything)
+          #   -a = archive mode: preserves file permissions, timestamps, and directory structure
+          #   -v = verbose: lists each file being transferred (visible in Actions logs)
+          #   -z = compress: compresses data during transfer to save bandwidth
+          #   --exclude = skip these directories (not needed on the server)
+          #   --delete = remove files on server that no longer exist in the repo
+          #              (keeps the server clean, prevents old files from lingering)
+          #   -e = use this SSH command (with our deploy key) for the connection
           rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipelinemaster/
 
-          # Install deps and start/restart the app on port 3001
-          # Uses pm2 with name "pipelinemaster" to differentiate from the test instance
-          # PORT=3001 so it doesn't conflict with the test deploy on port 3000
+          # --- INSTALL DEPS & RESTART APP ---
+
+          # SSH into the server and run commands remotely:
+          #   cd /var/www/pipelinemaster  → go to the app directory
+          #   npm ci --omit=dev           → install production dependencies on the server
+          #   pm2 restart pipelinemaster  → restart the app if it's already running
+          #   || pm2 start ...            → OR start it fresh if first deploy
+          #   --name pipelinemaster       → give it a unique pm2 name (different from "pipeline")
+          #   PORT=3001                   → run on port 3001 (test branch uses 3000)
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
             "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 restart pipelinemaster || PORT=3001 pm2 start src/server.js --name pipelinemaster)"
 

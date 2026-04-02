@@ -196,7 +196,3 @@ jobs:
             "cd /var/www/pipeline && npm ci --omit=dev && (pm2 restart pipeline || pm2 start src/server.js --name pipeline)"
 
           echo "✅ Deployment to test server complete"
-          #   ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipeline/
-          # ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-          #   "cd /var/www/pipeline && npm ci --omit=dev && pm2 restart pipeline"
-          echo "✅ Deployment to test server complete"
