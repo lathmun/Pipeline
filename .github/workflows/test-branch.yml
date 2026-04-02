@@ -163,8 +163,7 @@ jobs:
 
           # Step B: Write the SSH private key from GitHub Secrets to a file
           # The runner is a fresh VM each time — nothing persists between runs
-          # printf '%s' writes the exact bytes without mangling newlines or escape sequences
-          printf '%s' "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
 
           # Step C: Set strict permissions (SSH refuses keys with open permissions)
           chmod 600 ~/.ssh/deploy_key

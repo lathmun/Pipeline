@@ -117,8 +117,7 @@ jobs:
 
           # Write the private SSH key from GitHub Secrets into a file
           # This key matches the public key we added to the server's authorized_keys
-          # printf '%s' writes the exact bytes without mangling newlines or escape sequences
-          printf '%s' "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
 
           # Set file permissions to 600 (owner read/write only)
           # SSH REQUIRES this — it refuses to use keys with loose permissions
