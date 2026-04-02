@@ -155,11 +155,16 @@ jobs:
           # SSH into the server and run commands remotely:
           #   cd /var/www/pipelinemaster  → go to the app directory
           #   npm ci --omit=dev           → install production dependencies on the server
-          #   pm2 restart pipelinemaster  → restart the app if it's already running
-          #   || pm2 start ...            → OR start it fresh if first deploy
+          #   pm2 delete pipelinemaster   → remove old process (ignore error if not running)
+          #   pm2 start ...              → start fresh with correct cwd, PORT, and env
           #   --name pipelinemaster       → give it a unique pm2 name (different from "pipeline")
           #   PORT=3001                   → run on port 3001 (test branch uses 3000)
+          #
+          # WHY delete+start instead of restart?
+          #   pm2 restart reuses the ORIGINAL cwd and env from when the process was first created.
+          #   If the original start had wrong settings, restart keeps those bad settings.
+          #   delete+start ensures a clean slate every deploy.
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 restart pipelinemaster || PORT=3001 pm2 start src/server.js --name pipelinemaster)"
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && PORT=3001 pm2 start src/server.js --name pipelinemaster"
 
           echo "✅ Master deployed to /var/www/pipelinemaster (port 3001)"
