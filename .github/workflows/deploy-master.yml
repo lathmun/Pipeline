@@ -92,18 +92,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install Node.js (needed for npm ci in the next step)
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      # Install ONLY production dependencies — skip devDependencies (jest, etc.)
-      # --omit=dev means: don't install packages from "devDependencies" in package.json
-      # Why? The server doesn't need test tools — only the app code and its runtime deps
-      - name: Install production dependencies
-        run: npm ci --omit=dev
+      # NOTE: We do NOT install dependencies on the runner.
+      # rsync excludes node_modules anyway, and the server runs npm ci itself.
+      # Installing here would be redundant and slow down the pipeline.
 
       # The main deployment step — connects to the server via SSH and copies files
       - name: Deploy to master path on server
