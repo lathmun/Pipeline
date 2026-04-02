@@ -1,0 +1,71 @@
+# =============================================================================
+# CI/CD PIPELINE — PULL REQUEST TO MASTER
+# =============================================================================
+#
+# WHAT DOES THIS PIPELINE DO?
+#   Runs all tests whenever someone opens (or updates) a Pull Request
+#   that targets the `master` branch.
+#
+# WHY?
+#   This acts as a GATE. Combined with branch protection rules, it prevents
+#   anyone from merging broken code into master. The test results show as
+#   a green checkmark ✅ or red X ❌ directly on the PR page.
+#
+# WORKFLOW:
+#   Developer pushes to `test` branch
+#     → test-branch.yml runs tests + deploys to test server
+#     → Developer manually tests the app on the test server
+#     → Developer creates a PR from `test` → `master`
+#     → THIS workflow runs tests again as a final check
+#     → If tests pass + PR is approved → merge is allowed
+#
+# NOTE: This pipeline does NOT deploy anything. It only validates.
+#       Deployment from master would be a separate workflow if needed.
+# =============================================================================
+
+name: PR to Master
+
+# =============================================================================
+# TRIGGER: Pull Request events targeting master
+# =============================================================================
+# "pull_request" triggers when:
+#   - A new PR is opened targeting master
+#   - New commits are pushed to an existing PR targeting master
+#   - A PR is reopened
+#
+# This does NOT trigger on direct pushes to master (which should be blocked
+# by branch protection rules anyway).
+on:
+  pull_request:
+    branches:
+      - master  # Only PRs that want to merge INTO master
+
+# =============================================================================
+# JOBS
+# =============================================================================
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone the PR's code (GitHub automatically merges the PR branch
+      # with the target branch so tests run against the merged result).
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # If this step fails, GitHub shows a red X on the PR.
+      # With branch protection enabled, the "Merge" button will be
+      # disabled until tests pass — preventing broken code from
+      # reaching master
+      - name: Run tests
+        run: npm test

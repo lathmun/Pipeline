@@ -1,0 +1,202 @@
+# =============================================================================
+# CI/CD PIPELINE — TEST BRANCH
+# =============================================================================
+#
+# WHAT IS THIS FILE?
+#   This is a GitHub Actions workflow file. GitHub Actions is a CI/CD
+#   (Continuous Integration / Continuous Deployment) service built into GitHub.
+#   Workflow files live in .github/workflows/ and are written in YAML format.
+#   GitHub automatically detects and runs them when the trigger conditions match.
+#
+# WHAT DOES THIS PIPELINE DO?
+#   1. Triggers whenever someone pushes code to the `test` branch.
+#   2. First job: runs all tests (npm test). If any test fails, the pipeline stops.
+#   3. Second job: if all tests passed, deploys the app to the test server.
+#
+# WHY?
+#   This ensures broken code never reaches the test server. Only code that
+#   passes all tests gets deployed automatically.
+# =============================================================================
+
+# "name" — A human-readable label for this workflow.
+# This shows up in the GitHub Actions tab so you can identify it.
+name: Test Branch Pipeline
+
+# =============================================================================
+# TRIGGER SECTION ("on")
+# =============================================================================
+# "on" defines WHEN this workflow runs. There are many trigger types:
+#   - push: when code is pushed to a branch
+#   - pull_request: when a PR is opened/updated
+#   - schedule: on a cron schedule
+#   - workflow_dispatch: manual trigger from GitHub UI
+#
+# Here we trigger on "push" to the "test" branch only.
+# Pushing to any other branch (e.g., main, feature-x) will NOT trigger this.
+on:
+  push:
+    branches:
+      - test  # Only the test branch triggers this workflow
+
+# =============================================================================
+# JOBS SECTION
+# =============================================================================
+# "jobs" contains one or more jobs that run in the pipeline.
+# Each job runs on its own fresh virtual machine (called a "runner").
+# Jobs run in PARALLEL by default, unless you use "needs" to create dependencies.
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # JOB 1: TEST
+  # ---------------------------------------------------------------------------
+  # This job checks out the code, installs dependencies, and runs the tests.
+  # If any test fails, this job fails, and the deploy job will NOT run.
+  test:
+    name: Run Tests  # Display name in GitHub Actions UI
+
+    # "runs-on" — Which operating system to use for the runner.
+    # Options include: ubuntu-latest, windows-latest, macos-latest
+    # ubuntu-latest is the most common because it's fast and free.
+    runs-on: ubuntu-latest
+
+    # "steps" — A sequence of actions that run one after another inside this job.
+    # Each step is either:
+    #   - "uses": runs a pre-built action from the GitHub Actions marketplace
+    #   - "run": executes a shell command
+    steps:
+
+      # Step 1: Check out the repository code onto the runner.
+      # Without this, the runner has an empty filesystem — it needs your code!
+      # actions/checkout@v4 is the official GitHub action for cloning your repo.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Node.js on the runner.
+      # The runner has some tools pre-installed, but we want a specific Node version.
+      # "with" passes configuration to the action:
+      #   - node-version: which Node.js version to install
+      #   - cache: 'npm' caches the npm dependency cache between runs for speed
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'  # Caches ~/.npm so future installs are faster
+
+      # Step 3: Install project dependencies.
+      # "npm ci" is like "npm install" but:
+      #   - It's faster (skips some checks)
+      #   - It uses the exact versions from package-lock.json (deterministic)
+      #   - It's designed for CI environments
+      # Always use "npm ci" in pipelines instead of "npm install".
+      - name: Install dependencies
+        run: npm ci
+
+      # Step 4: Run the test suite.
+      # This executes whatever is in the "test" script in package.json.
+      # If any test fails, this step exits with a non-zero code,
+      # which causes the entire job to fail.
+      - name: Run tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: DEPLOY TO TEST SERVER
+  # ---------------------------------------------------------------------------
+  # This job deploys the app to the test server, but ONLY if all tests passed.
+  deploy-test:
+    name: Deploy to Test Server
+
+    # "needs: test" — This job depends on the "test" job above.
+    # It will NOT start until the "test" job completes.
+    # Without "needs", jobs run in parallel, and deploy could start
+    # before tests even finish!
+    needs: test
+
+    runs-on: ubuntu-latest
+
+    # "if: success()" — Only run this job if all dependent jobs succeeded.
+    # This is actually the default when using "needs", but it's good to
+    # be explicit. Other options:
+    #   - if: failure()     — run only if previous job failed
+    #   - if: always()      — run regardless of success/failure
+    #   - if: cancelled()   — run only if workflow was cancelled
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install ONLY production dependencies (skip devDependencies like jest).
+      # --omit=dev tells npm to skip packages listed in "devDependencies".
+      # On the server, you don't need test frameworks — just the app code.
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+
+      # Deploy to the test server using SSH.
+      #
+      # "env" — Environment variables available to this step.
+      # ${{ secrets.XXX }} reads values from GitHub Secrets.
+      #
+      # HOW TO SET UP GITHUB SECRETS:
+      #   1. Go to your repo on GitHub
+      #   2. Settings → Secrets and variables → Actions
+      #   3. Click "New repository secret"
+      #   4. Add these three secrets:
+      #      - TEST_SERVER_HOST  (e.g., 192.168.1.100 or test.example.com)
+      #      - TEST_SERVER_USER  (e.g., deploy)
+      #      - TEST_SERVER_SSH_KEY (the private SSH key for authentication)
+      #
+      # Secrets are encrypted and never shown in logs.
+      - name: Deploy to test server
+        env:
+          TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
+          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
+          TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
+        run: |
+          echo "Deploying to test server..."
+
+          # --- DEPLOYMENT COMMANDS ---
+          # These are UNCOMMENTED and ready to run once you add GitHub Secrets.
+          # If secrets are not set, the deploy will fail (which is expected).
+
+          # Step A: Create .ssh directory on the GitHub Actions runner
+          mkdir -p ~/.ssh
+
+          # Step B: Write the SSH private key from GitHub Secrets to a file
+          # The runner is a fresh VM each time — nothing persists between runs
+          echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key
+
+          # Step C: Set strict permissions (SSH refuses keys with open permissions)
+          chmod 600 ~/.ssh/deploy_key
+
+          # Step D: Add the server to known_hosts so SSH doesn't prompt "are you sure?"
+          ssh-keyscan -H $TEST_SERVER_HOST >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Step E: Use rsync to copy app files to the DigitalOcean droplet
+          # rsync only transfers CHANGED files (fast after first deploy)
+          #   -a = archive mode (preserves permissions, timestamps)
+          #   -v = verbose (shows what's being transferred — visible in Actions logs)
+          #   -z = compress during transfer (saves bandwidth)
+          #   --exclude = skip folders not needed on server
+          #   --delete = remove files on server that no longer exist in repo
+          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipeline/
+
+          # Step F: SSH into the droplet, install deps, and start/restart the app
+          # "pm2 restart pipeline || pm2 start ... --name pipeline"
+          #   - Tries to restart first (if app already running)
+          #   - If not running yet (first deploy), starts it fresh
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+            "cd /var/www/pipeline && npm ci --omit=dev && (pm2 restart pipeline || pm2 start src/server.js --name pipeline)"
+
+          echo "✅ Deployment to test server complete"
+          #   ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipeline/
+          # ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+          #   "cd /var/www/pipeline && npm ci --omit=dev && pm2 restart pipeline"
+          echo "✅ Deployment to test server complete"
