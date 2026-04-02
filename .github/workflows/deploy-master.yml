@@ -156,29 +156,11 @@ jobs:
           #   1. cd into the app directory
           #   2. npm ci --omit=dev → install production dependencies
           #   3. pm2 delete → remove old process (ignore error if not running)
-          #   4. Write an ecosystem.config.js → pm2 config file that sets PORT=5001
+          #   4. Write ecosystem.config.js with PORT=5001
           #      This is the RELIABLE way to pass env vars to pm2.
-          #      Inline env vars (PORT=5001 pm2 start) and export are NOT reliable
-          #      because pm2 spawns child processes that may not inherit them.
           #   5. pm2 start ecosystem.config.js → start using the config file
           #   6. pm2 save → persist the process list so pm2 remembers after reboot
-          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} << 'ENDSSH'
-            cd /var/www/pipelinemaster
-            npm ci --omit=dev
-            pm2 delete pipelinemaster 2>/dev/null || true
-            cat > ecosystem.config.js << 'EOF'
-module.exports = {
-  apps: [{
-    name: "pipelinemaster",
-    script: "src/server.js",
-    env: {
-      PORT: 5001
-    }
-  }]
-};
-EOF
-            pm2 start ecosystem.config.js
-            pm2 save
-          ENDSSH
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipelinemaster\",script:\"src/server.js\",env:{PORT:5001}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
 
           echo "✅ Master deployed to /var/www/pipelinemaster (port 5001)"
