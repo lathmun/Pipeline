@@ -6,7 +6,7 @@ A Node.js application with a CI/CD pipeline for safe deployment.
 
 ```bash
 npm install
-npm start        # Start server at http://localhost:3000
+npm start        # Start server at http://localhost:5000
 npm test         # Run test suite
 ```
 
@@ -14,8 +14,8 @@ npm test         # Run test suite
 
 ## Pages
 
-- `http://localhost:3000` — Items Manager (main app)
-- `http://localhost:3000/checklist.html` — Pipeline setup checklist
+- `http://localhost:5000` — Items Manager (main app)
+- `http://localhost:5000/checklist.html` — Pipeline setup checklist
 
 ## API Endpoints
 

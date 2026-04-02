@@ -198,5 +198,19 @@
       } catch (e) { showMsg(e.message, 'error'); }
     };
   </script>
+  <p id="version-info" style="text-align:center; color:#aaa; font-size:12px; margin-top:30px;">Loading version...</p>
+  <script>
+    // Fetch the version info from version.json and display it at the bottom
+    // The "?t=" cache buster ensures the browser always gets the latest version
+    fetch('/version.json?t=' + Date.now())
+      .then(r => r.json())
+      .then(v => {
+        document.getElementById('version-info').textContent =
+          'v' + v.version + ' — ' + v.date + ' ' + v.time + ' UTC';
+      })
+      .catch(() => {
+        document.getElementById('version-info').textContent = 'Version info unavailable';
+      });
+  </script>
 </body>
 </html>
