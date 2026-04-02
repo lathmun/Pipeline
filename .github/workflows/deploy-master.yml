@@ -159,12 +159,13 @@ jobs:
           #   pm2 start ...              → start fresh with correct cwd, PORT, and env
           #   --name pipelinemaster       → give it a unique pm2 name (different from "pipeline")
           #   PORT=3001                   → run on port 3001 (test branch uses 3000)
+          #   We use export PORT=3001 to ensure pm2 passes it to the Node.js process
           #
           # WHY delete+start instead of restart?
           #   pm2 restart reuses the ORIGINAL cwd and env from when the process was first created.
           #   If the original start had wrong settings, restart keeps those bad settings.
           #   delete+start ensures a clean slate every deploy.
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && PORT=3001 pm2 start src/server.js --name pipelinemaster"
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && export PORT=3001 && pm2 start src/server.js --name pipelinemaster"
 
           echo "✅ Master deployed to /var/www/pipelinemaster (port 3001)"
