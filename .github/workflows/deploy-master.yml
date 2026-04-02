@@ -11,12 +11,12 @@
 #   - /var/www/pipelinemaster → master branch deployment (stable, verified code)
 #
 #   This way both versions can run side-by-side on the same server:
-#     staging.mytown-online.de → port 3000 (test branch)
-#     stable.mytown-online.de  → port 3001 (master branch)
+#     staging.mytown-online.de → port 5000 (test branch)
+#     stable.mytown-online.de  → port 5001 (master branch)
 #
 # FLOW:
 #   PR merged into master → this workflow triggers → tests run →
-#   if pass → deploy to /var/www/pipelinemaster on port 3001
+#   if pass → deploy to /var/www/pipelinemaster on port 5001
 # =============================================================================
 
 # "name" — Human-readable label shown in the GitHub Actions tab.
@@ -153,19 +153,32 @@ jobs:
           # --- INSTALL DEPS & RESTART APP ---
 
           # SSH into the server and run commands remotely:
-          #   cd /var/www/pipelinemaster  → go to the app directory
-          #   npm ci --omit=dev           → install production dependencies on the server
-          #   pm2 delete pipelinemaster   → remove old process (ignore error if not running)
-          #   pm2 start ...              → start fresh with correct cwd, PORT, and env
-          #   --name pipelinemaster       → give it a unique pm2 name (different from "pipeline")
-          #   PORT=3001                   → run on port 3001 (test branch uses 3000)
-          #   We use export PORT=3001 to ensure pm2 passes it to the Node.js process
-          #
-          # WHY delete+start instead of restart?
-          #   pm2 restart reuses the ORIGINAL cwd and env from when the process was first created.
-          #   If the original start had wrong settings, restart keeps those bad settings.
-          #   delete+start ensures a clean slate every deploy.
-          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && export PORT=3001 && pm2 start src/server.js --name pipelinemaster"
+          #   1. cd into the app directory
+          #   2. npm ci --omit=dev → install production dependencies
+          #   3. pm2 delete → remove old process (ignore error if not running)
+          #   4. Write an ecosystem.config.js → pm2 config file that sets PORT=5001
+          #      This is the RELIABLE way to pass env vars to pm2.
+          #      Inline env vars (PORT=5001 pm2 start) and export are NOT reliable
+          #      because pm2 spawns child processes that may not inherit them.
+          #   5. pm2 start ecosystem.config.js → start using the config file
+          #   6. pm2 save → persist the process list so pm2 remembers after reboot
+          ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} << 'ENDSSH'
+            cd /var/www/pipelinemaster
+            npm ci --omit=dev
+            pm2 delete pipelinemaster 2>/dev/null || true
+            cat > ecosystem.config.js << 'EOF'
+module.exports = {
+  apps: [{
+    name: "pipelinemaster",
+    script: "src/server.js",
+    env: {
+      PORT: 5001
+    }
+  }]
+};
+EOF
+            pm2 start ecosystem.config.js
+            pm2 save
+          ENDSSH
 
-          echo "✅ Master deployed to /var/www/pipelinemaster (port 3001)"
+          echo "✅ Master deployed to /var/www/pipelinemaster (port 5001)"

@@ -1,7 +1,7 @@
 const app = require('./app');
 const path = require('path');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Log startup info for debugging deployment issues
 console.log(`[startup] __dirname: ${__dirname}`);
