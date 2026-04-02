@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 01 — CI/CD Pipelines with GitHub Actions</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.7; }
+  
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 6px; transition: background .2s; }
+  nav a:hover { background: rgba(88,166,255,.15); }
+  nav .title { font-weight: 700; color: var(--text); font-size: 16px; margin-right: auto; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* SECTIONS */
+  section { margin-bottom: 64px; }
+  h1 { font-size: 2.4em; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.8em; color: var(--accent); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.3em; color: var(--purple); margin: 24px 0 12px; }
+  p, li { color: var(--text); margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 1.1em; margin-bottom: 32px; }
+
+  /* CONCEPT CARDS */
+  .concepts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 16px; }
+  .concept-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: transform .2s, box-shadow .2s; }
+  .concept-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .concept-card .icon { font-size: 2em; margin-bottom: 12px; }
+  .concept-card h4 { color: var(--accent); margin-bottom: 8px; font-size: 1.1em; }
+  .concept-card p { color: var(--muted); font-size: .95em; line-height: 1.6; }
+
+  /* CODE BLOCKS */
+  .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; overflow-x: auto; font-family: 'Fira Code', 'Consolas', monospace; font-size: 14px; line-height: 1.8; position: relative; }
+  .code-block .line { display: block; }
+  .code-block .line:hover { background: rgba(88,166,255,.06); }
+  .code-block .comment { color: var(--muted); font-style: italic; }
+  .code-block .keyword { color: var(--pink); }
+  .code-block .string { color: var(--green); }
+  .code-block .key { color: var(--purple); }
+  .code-block .label { position: absolute; top: 8px; right: 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* PIPELINE VISUALIZATION */
+  .pipeline-viz { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin: 20px 0; overflow-x: auto; }
+  .pipeline-flow { display: flex; align-items: center; gap: 0; justify-content: center; flex-wrap: wrap; min-height: 120px; }
+  .pipeline-step { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 140px; transition: all .4s ease; position: relative; }
+  .pipeline-step .step-icon { font-size: 1.8em; margin-bottom: 6px; }
+  .pipeline-step .step-name { font-weight: 600; font-size: .9em; }
+  .pipeline-step .step-detail { color: var(--muted); font-size: .75em; margin-top: 4px; }
+  .pipeline-arrow { font-size: 1.5em; color: var(--muted); padding: 0 8px; flex-shrink: 0; }
+  .pipeline-step.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(88,166,255,.3); }
+  .pipeline-step.done { border-color: var(--green); }
+  .pipeline-step.done .step-icon::after { content: ' ✅'; font-size: .6em; }
+  .pipeline-step.fail { border-color: var(--red); }
+  .pipeline-step.fail .step-icon::after { content: ' ❌'; font-size: .6em; }
+
+  .anim-controls { display: flex; gap: 12px; margin-top: 16px; justify-content: center; }
+  .anim-btn { background: var(--accent); color: #fff; border: none; padding: 8px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background .2s; }
+  .anim-btn:hover { background: #79c0ff; }
+  .anim-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .anim-btn.secondary:hover { border-color: var(--accent); }
+  .pipeline-status { text-align: center; margin-top: 12px; font-size: .95em; min-height: 24px; color: var(--muted); }
+
+  /* LINE-BY-LINE EXPLAINER */
+  .explainer { margin: 20px 0; }
+  .explainer-line { display: flex; gap: 16px; padding: 8px 12px; border-radius: 8px; margin: 2px 0; transition: background .2s; cursor: pointer; align-items: flex-start; }
+  .explainer-line:hover { background: rgba(88,166,255,.08); }
+  .explainer-line.highlight { background: rgba(88,166,255,.12); border-left: 3px solid var(--accent); }
+  .explainer-code { font-family: 'Fira Code', 'Consolas', monospace; font-size: 13px; white-space: pre; flex-shrink: 0; min-width: 420px; color: var(--text); }
+  .explainer-desc { color: var(--muted); font-size: 13px; line-height: 1.6; border-left: 2px solid var(--border); padding-left: 12px; }
+  .explainer-line .line-num { color: var(--muted); font-size: 12px; font-family: monospace; min-width: 28px; text-align: right; flex-shrink: 0; user-select: none; }
+
+  /* FLASH CARDS */
+  .flashcard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .flashcard { perspective: 1000px; height: 220px; cursor: pointer; }
+  .flashcard-inner { position: relative; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+  .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+  .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .flashcard-front { background: linear-gradient(135deg, #1a1f36, #161b22); border: 2px solid var(--accent); }
+  .flashcard-front .q-label { color: var(--accent); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-front p { font-size: 1.1em; font-weight: 500; }
+  .flashcard-back { background: linear-gradient(135deg, #0f2d1a, #161b22); border: 2px solid var(--green); transform: rotateY(180deg); }
+  .flashcard-back .a-label { color: var(--green); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-back p { font-size: .95em; color: var(--text); line-height: 1.6; }
+  .flashcard-hint { color: var(--muted); font-size: .75em; margin-top: 12px; }
+
+  /* FAQ */
+  .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin: 12px 0; overflow: hidden; }
+  .faq-q { padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; transition: background .2s; }
+  .faq-q:hover { background: rgba(88,166,255,.06); }
+  .faq-q .arrow { transition: transform .3s; color: var(--muted); }
+  .faq-q.open .arrow { transform: rotate(180deg); }
+  .faq-a { padding: 0 20px; max-height: 0; overflow: hidden; transition: max-height .4s ease, padding .4s ease; color: var(--muted); line-height: 1.8; }
+  .faq-a.open { max-height: 600px; padding: 0 20px 20px; }
+  .faq-a code { background: var(--bg); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: .9em; color: var(--accent); }
+  .faq-tag { display: inline-block; background: rgba(88,166,255,.15); color: var(--accent); font-size: .7em; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: 400; }
+
+  /* COMPARISON TABLE */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { padding: 12px 16px; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+  td { background: var(--bg); }
+  tr:hover td { background: rgba(88,166,255,.04); }
+
+  /* TOOLTIPS */
+  .tooltip { position: relative; text-decoration: underline dotted var(--accent); cursor: help; color: var(--accent); }
+  .tooltip .tip-text { visibility: hidden; background: var(--surface); color: var(--text); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: .85em; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  .tooltip:hover .tip-text { visibility: visible; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: .75em; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+  .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-orange { background: rgba(210,153,34,.15); color: var(--orange); }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .explainer-line { flex-direction: column; gap: 4px; }
+    .explainer-code { min-width: unset; font-size: 12px; }
+    .pipeline-flow { flex-direction: column; }
+    .pipeline-arrow { transform: rotate(90deg); }
+    nav { padding: 8px 12px; }
+    h1 { font-size: 1.8em; }
+  }
+
+  /* SCROLL ANIMATION */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s, transform .6s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📚 Lecture 01</span>
+  <a href="#concepts">Concepts</a>
+  <a href="#pipeline-test">Test Pipeline</a>
+  <a href="#pipeline-master">Master Pipeline</a>
+  <a href="#code-explained">Code Explained</a>
+  <a href="#flashcards">Flash Cards</a>
+  <a href="#faq">FAQ</a>
+  <a href="quiz.html">📝 Take Quiz (60 Questions)</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ HERO ═══════════ -->
+<section>
+  <h1>CI/CD Pipelines with GitHub Actions</h1>
+  <p class="subtitle">Everything you need to know about automating your code from push to production — explained step by step with animations.</p>
+</section>
+
+<!-- ═══════════ CORE CONCEPTS ═══════════ -->
+<section id="concepts" class="reveal">
+  <h2>🧠 Core Concepts</h2>
+  <p>Before diving into the pipelines, let's understand the building blocks.</p>
+
+  <div class="concepts-grid">
+    <div class="concept-card">
+      <div class="icon">🔄</div>
+      <h4>CI — Continuous Integration</h4>
+      <p>Every time you push code, tests run <strong>automatically</strong>. This catches bugs immediately — before anyone else sees them. Think of it as a spell-checker for code.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🚀</div>
+      <h4>CD — Continuous Deployment</h4>
+      <p>If all tests pass, the code is deployed to a server <strong>automatically</strong>. No manual SSH, no copying files. Push → Tests → Live.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📄</div>
+      <h4>Workflow File (YAML)</h4>
+      <p>A <code>.yml</code> file inside <code>.github/workflows/</code> that tells GitHub Actions <strong>what to do</strong> and <strong>when to do it</strong>. Like a recipe — step by step instructions.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">⚡</div>
+      <h4>Trigger (on:)</h4>
+      <p>The event that <strong>starts</strong> the pipeline. Examples: push to a branch, creating a PR, on a schedule. Without a trigger, nothing runs.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">💼</div>
+      <h4>Job</h4>
+      <p>A group of steps that run on the <strong>same machine</strong>. Jobs run in parallel by default. Use <code>needs:</code> to create a dependency chain (run after another job).</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">👣</div>
+      <h4>Step</h4>
+      <p>A single action inside a job — either <code>uses:</code> (a pre-built action) or <code>run:</code> (a shell command). Steps always run <strong>sequentially</strong>.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🖥️</div>
+      <h4>Runner</h4>
+      <p>A temporary virtual machine that GitHub creates to run your job. It's <strong>brand new each time</strong> — empty filesystem, no history. Think of it as a disposable computer.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔑</div>
+      <h4>Secrets</h4>
+      <p>Encrypted values stored in GitHub settings (like passwords, SSH keys, server IPs). They're injected as environment variables at runtime. <strong>Never</strong> hardcode secrets in workflow files.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📦</div>
+      <h4>npm ci</h4>
+      <p><strong>Clean Install</strong> — installs exact versions from <code>package-lock.json</code>. Faster and more reliable than <code>npm install</code>. Always use in CI. <code>--omit=dev</code> skips test tools.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📡</div>
+      <h4>rsync</h4>
+      <p>A tool that copies files from one machine to another. Only sends <strong>files that changed</strong> — much faster than copying everything. Uses SSH for secure transfer.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔄</div>
+      <h4>pm2</h4>
+      <p>A process manager for Node.js. Keeps your app <strong>running forever</strong> — restarts it if it crashes, manages logs, handles multiple apps on different ports.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🛡️</div>
+      <h4>Branch Protection</h4>
+      <p>Rules on GitHub that prevent direct pushes to master. Code can only enter master through a <strong>Pull Request</strong> that passes all checks. The gatekeeper.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ KEY COMPARISONS ═══════════ -->
+<section class="reveal">
+  <h2>⚖️ Key Comparisons</h2>
+
+  <h3>npm ci vs npm install</h3>
+  <table>
+    <tr><th>Feature</th><th>npm install</th><th>npm ci</th></tr>
+    <tr><td>Speed</td><td>Slower</td><td>Faster ⚡</td></tr>
+    <tr><td>Uses package-lock.json</td><td>May update it</td><td>Uses exact versions ✅</td></tr>
+    <tr><td>Deletes node_modules first</td><td>No</td><td>Yes (clean state)</td></tr>
+    <tr><td>Best for</td><td>Local development</td><td>CI/CD pipelines</td></tr>
+  </table>
+
+  <h3>dependencies vs devDependencies</h3>
+  <table>
+    <tr><th></th><th>dependencies</th><th>devDependencies</th></tr>
+    <tr><td>What</td><td>Code the app <strong>needs to run</strong></td><td>Tools only for <strong>development/testing</strong></td></tr>
+    <tr><td>Example</td><td>express</td><td>jest, supertest</td></tr>
+    <tr><td>Install with</td><td><code>npm ci</code></td><td><code>npm ci</code> (included)</td></tr>
+    <tr><td>Skip with</td><td>—</td><td><code>npm ci --omit=dev</code></td></tr>
+    <tr><td>Needed on server?</td><td>✅ Yes</td><td>❌ No</td></tr>
+  </table>
+
+  <h3>pm2 restart vs pm2 delete + start</h3>
+  <table>
+    <tr><th></th><th>pm2 restart</th><th>pm2 delete + start</th></tr>
+    <tr><td>CWD</td><td>Reuses <strong>original</strong> saved cwd</td><td>Uses <strong>current</strong> directory</td></tr>
+    <tr><td>Env vars</td><td>Reuses <strong>original</strong> env</td><td>Uses <strong>current</strong> env</td></tr>
+    <tr><td>Risk</td><td>Inherits stale/wrong settings</td><td>Clean slate every time ✅</td></tr>
+    <tr><td>Best for</td><td>Quick restarts (same config)</td><td>Deployments (config may change)</td></tr>
+  </table>
+
+  <h3>Our Two Deployment Paths</h3>
+  <table>
+    <tr><th></th><th>Test (Staging)</th><th>Master (Stable)</th></tr>
+    <tr><td>Branch</td><td>test</td><td>master</td></tr>
+    <tr><td>Trigger</td><td>Push to test</td><td>Merge PR to master</td></tr>
+    <tr><td>Server path</td><td>/var/www/pipeline</td><td>/var/www/pipelinemaster</td></tr>
+    <tr><td>Port</td><td>5000</td><td>5001</td></tr>
+    <tr><td>Subdomain</td><td>staging.mytown-online.de</td><td>stable.mytown-online.de</td></tr>
+    <tr><td>pm2 name</td><td>pipeline</td><td>pipelinemaster</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════ TEST PIPELINE ANIMATION ═══════════ -->
+<section id="pipeline-test" class="reveal">
+  <h2>🧪 Test Branch Pipeline — Animated</h2>
+  <p>What happens when you push code to the <code>test</code> branch:</p>
+
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="test-flow">
+      <div class="pipeline-step" id="t-push">
+        <div class="step-icon">📤</div>
+        <div class="step-name">git push</div>
+        <div class="step-detail">Push to test branch</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-checkout">
+        <div class="step-icon">📥</div>
+        <div class="step-name">Checkout</div>
+        <div class="step-detail">Clone code to runner</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-install">
+        <div class="step-icon">📦</div>
+        <div class="step-name">npm ci</div>
+        <div class="step-detail">Install all deps</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-test">
+        <div class="step-icon">🧪</div>
+        <div class="step-name">npm test</div>
+        <div class="step-detail">Run 11 tests</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-ssh">
+        <div class="step-icon">🔑</div>
+        <div class="step-name">SSH Setup</div>
+        <div class="step-detail">Write deploy key</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-rsync">
+        <div class="step-icon">📡</div>
+        <div class="step-name">rsync</div>
+        <div class="step-detail">Copy files to server</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="t-pm2">
+        <div class="step-icon">🚀</div>
+        <div class="step-name">pm2 start</div>
+        <div class="step-detail">App live on :5000</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="test-status">Click "Run" to see the pipeline in action</div>
+    <div class="anim-controls">
+      <button class="anim-btn" onclick="runPipelineAnim('test', true)">▶ Run (Pass)</button>
+      <button class="anim-btn secondary" onclick="runPipelineAnim('test', false)">▶ Run (Fail)</button>
+      <button class="anim-btn secondary" onclick="resetAnim('test')">↺ Reset</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ MASTER PIPELINE ANIMATION ═══════════ -->
+<section id="pipeline-master" class="reveal">
+  <h2>🏆 Master Pipeline — Animated</h2>
+  <p>What happens when a Pull Request is merged into <code>master</code>:</p>
+
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="master-flow">
+      <div class="pipeline-step" id="m-merge">
+        <div class="step-icon">🔀</div>
+        <div class="step-name">PR Merged</div>
+        <div class="step-detail">Merge into master</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-checkout">
+        <div class="step-icon">📥</div>
+        <div class="step-name">Checkout</div>
+        <div class="step-detail">Clone code to runner</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-install">
+        <div class="step-icon">📦</div>
+        <div class="step-name">npm ci</div>
+        <div class="step-detail">Install all deps</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-test">
+        <div class="step-icon">🧪</div>
+        <div class="step-name">npm test</div>
+        <div class="step-detail">Final safety net</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-rsync">
+        <div class="step-icon">📡</div>
+        <div class="step-name">rsync</div>
+        <div class="step-detail">Copy to /pipelinemaster</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-eco">
+        <div class="step-icon">⚙️</div>
+        <div class="step-name">ecosystem.config</div>
+        <div class="step-detail">Set PORT=5001</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="m-pm2">
+        <div class="step-icon">🚀</div>
+        <div class="step-name">pm2 start</div>
+        <div class="step-detail">Stable on :5001</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="master-status">Click "Run" to see the pipeline in action</div>
+    <div class="anim-controls">
+      <button class="anim-btn" onclick="runPipelineAnim('master', true)">▶ Run (Pass)</button>
+      <button class="anim-btn secondary" onclick="runPipelineAnim('master', false)">▶ Run (Fail)</button>
+      <button class="anim-btn secondary" onclick="resetAnim('master')">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- PR Gate visualization -->
+  <h3>🚧 The PR Gate (pr-master.yml)</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="pr-flow">
+      <div class="pipeline-step" id="p-open">
+        <div class="step-icon">📝</div>
+        <div class="step-name">Open PR</div>
+        <div class="step-detail">test → master</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="p-test">
+        <div class="step-icon">🧪</div>
+        <div class="step-name">Run Tests</div>
+        <div class="step-detail">Automatic check</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="p-result">
+        <div class="step-icon">❓</div>
+        <div class="step-name">Result</div>
+        <div class="step-detail">Pass or fail?</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="p-merge">
+        <div class="step-icon">🔒</div>
+        <div class="step-name">Merge Gate</div>
+        <div class="step-detail">Button enabled?</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="pr-status">This pipeline only runs tests — it does NOT deploy</div>
+    <div class="anim-controls">
+      <button class="anim-btn" onclick="runPRAnim(true)">▶ Tests Pass</button>
+      <button class="anim-btn secondary" onclick="runPRAnim(false)">▶ Tests Fail</button>
+      <button class="anim-btn secondary" onclick="resetAnim('pr')">↺ Reset</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ FULL FLOW DIAGRAM ═══════════ -->
+<section class="reveal">
+  <h2>🗺️ The Complete CI/CD Flow</h2>
+  <p>How all three workflows connect together:</p>
+  <div class="pipeline-viz" style="padding:24px;">
+    <pre style="color:var(--text);font-family:monospace;font-size:14px;line-height:2;white-space:pre;overflow-x:auto;">
+  Developer's Machine                GitHub Actions                  DigitalOcean Server
+  ═══════════════════         ══════════════════════════         ═══════════════════════
+
+  ┌─────────────────┐         ┌──────────────────────┐         ┌─────────────────────┐
+  │  Write code     │         │  test-branch.yml     │         │  /var/www/pipeline   │
+  │  git add .      │ ──push──▶  ├─ Run tests       │ ─rsync─▶│  pm2: pipeline       │
+  │  git commit     │  test   │  └─ Deploy if pass ✅│         │  Port: 5000          │
+  │  git push       │ branch  └──────────────────────┘         │  staging.mytown...   │
+  └────────┬────────┘                                          └─────────────────────┘
+           │
+           │ Create PR                                         
+           │ test → master    ┌──────────────────────┐         
+           ├─────────────────▶│  pr-master.yml       │         
+           │                  │  └─ Run tests only   │         
+           │                  │     ✅ = can merge    │         
+           │                  │     ❌ = blocked      │         
+           │                  └──────────────────────┘         
+           │
+           │ Merge PR         ┌──────────────────────┐         ┌─────────────────────┐
+           └─────────────────▶│  deploy-master.yml   │         │  /var/www/pipeline-  │
+                              │  ├─ Run tests       │ ─rsync─▶│      master          │
+                              │  └─ Deploy if pass ✅│         │  pm2: pipelinemaster │
+                              └──────────────────────┘         │  Port: 5001          │
+                                                               │  stable.mytown...    │
+                                                               └─────────────────────┘
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════ LINE BY LINE CODE EXPLAINED ═══════════ -->
+<section id="code-explained" class="reveal">
+  <h2>📖 Pipeline Code — Line by Line</h2>
+  <p>Click any line to highlight it. Every line explained in the simplest possible way.</p>
+
+  <h3>test-branch.yml — The Main Pipeline</h3>
+  <div class="explainer" id="explainer-test">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">1</span>
+      <span class="explainer-code" style="color:var(--pink)">name: Test Branch Pipeline</span>
+      <span class="explainer-desc">A label for this workflow — shows up in GitHub's Actions tab so you can find it.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">2</span>
+      <span class="explainer-code" style="color:var(--pink)">on:</span>
+      <span class="explainer-desc">The <strong>trigger</strong> — defines WHEN this pipeline runs. Like saying "run this recipe when..."</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">3</span>
+      <span class="explainer-code">  push:</span>
+      <span class="explainer-desc">...someone pushes code (git push). Other options: pull_request, schedule, workflow_dispatch.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">4</span>
+      <span class="explainer-code">    branches: [test]</span>
+      <span class="explainer-desc">Only the <code>test</code> branch. Pushing to <code>master</code> or any other branch won't trigger this.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">5</span>
+      <span class="explainer-code" style="color:var(--pink)">jobs:</span>
+      <span class="explainer-desc">Start of the jobs section — the actual work the pipeline does.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">6</span>
+      <span class="explainer-code">  test:</span>
+      <span class="explainer-desc">First job named "test". This is an ID — use any name you want.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">7</span>
+      <span class="explainer-code">    runs-on: <span style="color:var(--green)">ubuntu-latest</span></span>
+      <span class="explainer-desc">Use a fresh Ubuntu virtual machine. It's free and fast. Options: ubuntu-latest, macos-latest, windows-latest.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">8</span>
+      <span class="explainer-code">    steps:</span>
+      <span class="explainer-desc">List of actions to run — like a to-do list executed top-to-bottom.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">9</span>
+      <span class="explainer-code">    - uses: <span style="color:var(--green)">actions/checkout@v4</span></span>
+      <span class="explainer-desc">Download your repo code onto the runner. Without this, the VM is empty — it has no files!</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">10</span>
+      <span class="explainer-code">    - uses: <span style="color:var(--green)">actions/setup-node@v4</span></span>
+      <span class="explainer-desc">Install Node.js on the runner. Like installing Node on a new computer.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">11</span>
+      <span class="explainer-code">      with: { node-version: <span style="color:var(--green)">'20'</span>, cache: <span style="color:var(--green)">'npm'</span> }</span>
+      <span class="explainer-desc">Use Node v20. <code>cache: npm</code> saves downloaded packages between runs — makes installs faster.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">12</span>
+      <span class="explainer-code">    - run: <span style="color:var(--green)">npm ci</span></span>
+      <span class="explainer-desc">Install ALL dependencies (express, jest, supertest). <code>npm ci</code> = <strong>clean install</strong> from lock file. Always use in CI.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">13</span>
+      <span class="explainer-code">    - run: <span style="color:var(--green)">npm test</span></span>
+      <span class="explainer-desc">Run all tests. If ANY fails → job fails → deploy is blocked. ✅ = safe to deploy.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">14</span>
+      <span class="explainer-code" style="color:var(--orange)">  deploy-test:</span>
+      <span class="explainer-desc">Second job — deploy to the server. Only runs if the test job passed.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">15</span>
+      <span class="explainer-code">    needs: <span style="color:var(--green)">test</span></span>
+      <span class="explainer-desc"><strong>KEY:</strong> Wait for the "test" job to finish first. Without this, deploy and test run at the same time!</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">16</span>
+      <span class="explainer-code">    if: <span style="color:var(--green)">success()</span></span>
+      <span class="explainer-desc">Only run if ALL jobs in "needs" passed. If tests failed, skip this entire job.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">17</span>
+      <span class="explainer-code">    env: { TEST_SERVER_HOST: <span style="color:var(--green)">${{ secrets.TEST_SERVER_HOST }}</span> }</span>
+      <span class="explainer-desc">Read encrypted secrets from GitHub Settings. Your server IP, username, SSH key — all hidden.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">18</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">mkdir -p ~/.ssh</span></span>
+      <span class="explainer-desc">Create the .ssh folder on the runner. Fresh VM = nothing exists yet.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">19</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">echo "$TEST_SERVER_KEY" > ~/.ssh/deploy_key</span></span>
+      <span class="explainer-desc">Write the SSH private key from secrets into a file. This key unlocks the server door.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">20</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">chmod 600 ~/.ssh/deploy_key</span></span>
+      <span class="explainer-desc">Lock file permissions. SSH refuses keys that anyone can read — <strong>must</strong> be 600 (owner only).</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">21</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">ssh-keyscan -H $HOST >> known_hosts</span></span>
+      <span class="explainer-desc">Remember the server's fingerprint. Without this, SSH asks "Are you sure?" and hangs forever.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">22</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">ssh ... "mkdir -p /var/www/pipeline"</span></span>
+      <span class="explainer-desc">Create app folder on the server (if first deploy). <code>-p</code> = no error if already exists.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">23</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">rsync -avz --exclude='node_modules' ...</span></span>
+      <span class="explainer-desc">Copy changed files to server. <code>-a</code>=archive, <code>-v</code>=verbose, <code>-z</code>=compress. Skips node_modules (server installs its own).</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">24</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">ssh ... "cd /var/www/pipeline && npm ci --omit=dev"</span></span>
+      <span class="explainer-desc">On the server: install only production deps (express). <code>--omit=dev</code> skips jest — server doesn't test.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">25</span>
+      <span class="explainer-code">    <span style="color:var(--muted)">(pm2 delete pipeline || true) && pm2 start ...</span></span>
+      <span class="explainer-desc">Stop old app, start fresh. <code>|| true</code> = don't crash if app wasn't running. Clean slate every deploy.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ FLASH CARDS ═══════════ -->
+<section id="flashcards" class="reveal">
+  <h2>🃏 Flash Cards — Click to Flip</h2>
+  <p>Test your memory! Click a card to reveal the answer.</p>
+
+  <div class="flashcard-container" id="flashcard-wrapper">
+    <!-- Cards inserted by JS -->
+  </div>
+
+  <div class="anim-controls" style="margin-top:24px;">
+    <button class="anim-btn secondary" onclick="shuffleCards()">🔀 Shuffle Cards</button>
+  </div>
+</section>
+
+<!-- ═══════════ FAQ ═══════════ -->
+<section id="faq" class="reveal">
+  <h2>❓ FAQ — Issues We Solved</h2>
+  <p>Real problems we hit during this project and how we fixed them.</p>
+  <div id="faq-container">
+    <!-- FAQ items inserted by JS -->
+  </div>
+</section>
+
+<!-- ═══════════ CHEAT SHEET ═══════════ -->
+<section class="reveal">
+  <h2>📋 Quick Reference Cheat Sheet</h2>
+  <div class="concepts-grid">
+    <div class="concept-card">
+      <h4>Git Commands</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line">git add .           <span class="comment"># Stage ALL files (incl. dotfiles)</span></span>
+<span class="line">git add *           <span class="comment"># ⚠️ Skips .github/, .gitignore</span></span>
+<span class="line">git commit -m "msg" <span class="comment"># Save staged changes</span></span>
+<span class="line">git push origin     <span class="comment"># Push to GitHub</span></span>
+<span class="line">git status          <span class="comment"># See what's staged/changed</span></span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>npm Commands</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line">npm ci              <span class="comment"># Clean install (all deps)</span></span>
+<span class="line">npm ci --omit=dev   <span class="comment"># Production only (no jest)</span></span>
+<span class="line">npm test            <span class="comment"># Run test suite</span></span>
+<span class="line">npm start           <span class="comment"># Start the server</span></span>
+<span class="line">npm run bump:patch  <span class="comment"># 1.0.0 → 1.0.1</span></span>
+<span class="line">npm run bump:minor  <span class="comment"># 1.0.0 → 1.1.0</span></span>
+<span class="line">npm run bump:major  <span class="comment"># 1.0.0 → 2.0.0</span></span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>pm2 Commands</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line">pm2 list            <span class="comment"># Show all running apps</span></span>
+<span class="line">pm2 logs app        <span class="comment"># See app's console output</span></span>
+<span class="line">pm2 start file.js   <span class="comment"># Start an app</span></span>
+<span class="line">pm2 delete app      <span class="comment"># Remove an app</span></span>
+<span class="line">pm2 save            <span class="comment"># Remember current setup</span></span>
+<span class="line">pm2 restart app     <span class="comment"># ⚠️ Keeps old env/cwd</span></span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>SSH / rsync</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line">ssh user@host       <span class="comment"># Connect to server</span></span>
+<span class="line">ssh -i key user@h   <span class="comment"># Connect with key file</span></span>
+<span class="line">chmod 600 keyfile   <span class="comment"># Set key permissions</span></span>
+<span class="line">rsync -avz src dst  <span class="comment"># Copy changed files</span></span>
+<span class="line">ssh-keyscan host    <span class="comment"># Get server fingerprint</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ NAV TO QUIZ ═══════════ -->
+<section class="reveal" style="text-align:center; padding:48px 0;">
+  <h2>Ready to test your knowledge?</h2>
+  <p style="margin:16px 0 24px; color:var(--muted);">60 multiple choice questions covering everything in this lecture.</p>
+  <a href="quiz.html" class="anim-btn" style="display:inline-block; text-decoration:none; font-size:1.2em; padding:14px 40px;">📝 Take the Quiz →</a>
+</section>
+
+</div>
+
+<script>
+// ═══════════ PIPELINE ANIMATIONS ═══════════
+const pipelineSteps = {
+  test: ['t-push','t-checkout','t-install','t-test','t-ssh','t-rsync','t-pm2'],
+  master: ['m-merge','m-checkout','m-install','m-test','m-rsync','m-eco','m-pm2']
+};
+const pipelineMessages = {
+  test: [
+    'Developer pushes code to the test branch...',
+    'GitHub Actions creates a fresh VM and clones the repo...',
+    'Installing ALL dependencies (express + jest + supertest)...',
+    'Running 11 tests with Jest...',
+    'Setting up SSH key to connect to the server...',
+    'rsync copies changed files to /var/www/pipeline/...',
+    '✅ App is live on port 5000!'
+  ],
+  master: [
+    'Pull Request merged into master (creates a merge commit)...',
+    'GitHub Actions clones the master branch code...',
+    'Installing all dependencies for testing...',
+    'Running tests — final safety net before deploy...',
+    'rsync copies files to /var/www/pipelinemaster/...',
+    'Writing ecosystem.config.js with PORT=5001...',
+    '✅ Stable version live on port 5001!'
+  ]
+};
+const failMessages = {
+  test: ['','','','❌ Test failed! Deploy job is SKIPPED. Fix the code and push again.'],
+  master: ['','','','❌ Test failed! Master deploy is SKIPPED. The merge commit has issues.']
+};
+
+function runPipelineAnim(type, pass) {
+  const steps = pipelineSteps[type];
+  const msgs = pipelineMessages[type];
+  const statusEl = document.getElementById(type + '-status');
+  resetAnim(type);
+
+  const failAt = pass ? -1 : 3; // fail at test step
+  let i = 0;
+
+  function next() {
+    if (i >= steps.length) return;
+    if (i === failAt && !pass) {
+      document.getElementById(steps[i]).classList.add('active');
+      setTimeout(() => {
+        document.getElementById(steps[i]).classList.remove('active');
+        document.getElementById(steps[i]).classList.add('fail');
+        statusEl.innerHTML = '<span style="color:var(--red)">' + failMessages[type][i] + '</span>';
+      }, 700);
+      return;
+    }
+    const el = document.getElementById(steps[i]);
+    el.classList.add('active');
+    statusEl.textContent = msgs[i];
+    setTimeout(() => {
+      el.classList.remove('active');
+      el.classList.add('done');
+      i++;
+      if (i < steps.length) setTimeout(next, 300);
+      else statusEl.innerHTML = '<span style="color:var(--green)">' + msgs[msgs.length-1] + '</span>';
+    }, 800);
+  }
+  next();
+}
+
+function resetAnim(type) {
+  let ids;
+  if (type === 'pr') ids = ['p-open','p-test','p-result','p-merge'];
+  else ids = pipelineSteps[type];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done','fail');
+  });
+  const statusEl = document.getElementById(type + '-status');
+  if (statusEl) statusEl.textContent = '';
+  // Reset PR-specific elements
+  if (type === 'pr') {
+    document.getElementById('p-result').querySelector('.step-icon').textContent = '❓';
+    document.getElementById('p-result').querySelector('.step-detail').textContent = 'Pass or fail?';
+    document.getElementById('p-merge').querySelector('.step-icon').textContent = '🔒';
+    document.getElementById('p-merge').querySelector('.step-detail').textContent = 'Button enabled?';
+  }
+}
+
+function runPRAnim(pass) {
+  resetAnim('pr');
+  const steps = ['p-open','p-test','p-result','p-merge'];
+  const statusEl = document.getElementById('pr-status');
+  let i = 0;
+
+  function next() {
+    if (i >= steps.length) return;
+    const el = document.getElementById(steps[i]);
+    el.classList.add('active');
+
+    setTimeout(() => {
+      el.classList.remove('active');
+      if (i === 2) { // result step
+        if (pass) {
+          el.classList.add('done');
+          el.querySelector('.step-icon').textContent = '✅';
+          el.querySelector('.step-detail').textContent = 'All tests pass!';
+          statusEl.textContent = 'Tests passed — checking merge gate...';
+        } else {
+          el.classList.add('fail');
+          el.querySelector('.step-icon').textContent = '❌';
+          el.querySelector('.step-detail').textContent = 'Tests failed!';
+          statusEl.innerHTML = '<span style="color:var(--red)">Tests failed — Merge button stays DISABLED. Fix and push again.</span>';
+          // Show locked merge
+          const mergeEl = document.getElementById('p-merge');
+          mergeEl.classList.add('fail');
+          mergeEl.querySelector('.step-icon').textContent = '🚫';
+          mergeEl.querySelector('.step-detail').textContent = 'Cannot merge!';
+          return;
+        }
+      } else if (i === 3) { // merge gate
+        if (pass) {
+          el.classList.add('done');
+          el.querySelector('.step-icon').textContent = '🔓';
+          el.querySelector('.step-detail').textContent = 'Merge allowed!';
+          statusEl.innerHTML = '<span style="color:var(--green)">✅ All checks passed — Merge button is GREEN and clickable!</span>';
+        }
+      } else {
+        el.classList.add('done');
+      }
+      i++;
+      if (i < steps.length) setTimeout(next, 300);
+    }, 800);
+  }
+
+  statusEl.textContent = 'PR opened — running automated tests...';
+  next();
+}
+
+// ═══════════ LINE HIGHLIGHTER ═══════════
+function highlightLine(el) {
+  document.querySelectorAll('.explainer-line').forEach(l => l.classList.remove('highlight'));
+  el.classList.add('highlight');
+}
+
+// ═══════════ FLASH CARDS ═══════════
+const flashcardData = [
+  { q: 'What does CI stand for?', a: 'Continuous Integration — automatically running tests every time code is pushed.' },
+  { q: 'What does CD stand for?', a: 'Continuous Deployment — automatically deploying code to a server after tests pass.' },
+  { q: 'Where do workflow files live?', a: 'In the .github/workflows/ directory. They must be YAML (.yml) files.' },
+  { q: 'What is a "runner" in GitHub Actions?', a: 'A temporary virtual machine that GitHub creates to execute your workflow. It\'s brand new each time — empty filesystem, no history.' },
+  { q: 'What does "needs: test" do?', a: 'Creates a dependency — the current job waits for the "test" job to finish before starting. Without it, jobs run in parallel.' },
+  { q: 'What does "if: success()" mean?', a: 'Only run this job if ALL dependent jobs passed. If any failed, skip this job entirely.' },
+  { q: 'What does npm ci do?', a: 'Clean Install — installs exact versions from package-lock.json. Faster, more reliable than npm install. Designed for CI environments.' },
+  { q: 'What does --omit=dev do?', a: 'Skips devDependencies (like jest, supertest). Only installs packages the app needs to RUN, not test tools.' },
+  { q: 'Why use rsync instead of scp?', a: 'rsync only transfers files that CHANGED — much faster for repeated deploys. scp would copy everything every time.' },
+  { q: 'What does chmod 600 do to an SSH key?', a: 'Sets permissions to owner-read-write only. SSH REFUSES to use keys with looser permissions — this is required.' },
+  { q: 'What does ssh-keyscan do?', a: 'Gets the server\'s fingerprint and saves it to known_hosts. Without it, SSH would prompt "Are you sure?" and hang in CI.' },
+  { q: 'Why pm2 delete + start instead of restart?', a: 'pm2 restart reuses the ORIGINAL saved cwd and env vars. delete + start ensures a clean slate with current settings every deploy.' },
+  { q: 'What is an ecosystem.config.js?', a: 'A pm2 config file that reliably passes environment variables (like PORT=5001) to the Node.js process.' },
+  { q: 'What are GitHub Secrets?', a: 'Encrypted values stored in repo settings. Injected as env vars at runtime. GitHub masks them in logs (best-effort).' },
+  { q: 'Why does git add * skip .github/?', a: 'The shell expands * which skips names starting with a dot. Use git add . instead — it tells git to add everything.' },
+  { q: 'What does rsync --delete do?', a: 'Removes files on the server that no longer exist in the repo. Keeps the server clean — prevents old files from lingering.' },
+  { q: 'What triggers deploy-master.yml?', a: 'A push to master — but since direct pushes are blocked, this only happens when a Pull Request is merged into master.' },
+  { q: 'What does pr-master.yml deploy?', a: 'Nothing! It only runs tests. It acts as a gate — if tests fail, the PR\'s Merge button stays disabled.' },
+  { q: 'What does cache: npm do in setup-node?', a: 'Caches the npm package cache (~/.npm) between workflow runs. Makes npm ci faster because packages don\'t need to be re-downloaded.' },
+  { q: 'What is branch protection?', a: 'Rules on GitHub that prevent direct pushes to a branch. Code can only enter through Pull Requests that pass all required checks.' },
+  { q: 'What is rsync -avz?', a: '-a = archive (preserves everything), -v = verbose (shows files), -z = compress (saves bandwidth during transfer).' },
+  { q: 'Why different ports (5000 vs 5001)?', a: 'Both apps run on the SAME server. Each needs its own port to avoid conflicts. Nginx maps subdomains to the right port.' },
+  { q: 'What does ${{ secrets.XXX }} do?', a: 'Reads an encrypted secret from GitHub Settings and injects it as a value. The actual value is hidden from logs.' },
+  { q: 'What is the purpose of "needs:" in a job?', a: 'It creates a dependency chain between jobs. The current job waits until all jobs listed in "needs" complete successfully.' },
+];
+
+function renderCards() {
+  const wrapper = document.getElementById('flashcard-wrapper');
+  wrapper.innerHTML = flashcardData.map((card, i) => `
+    <div class="flashcard" onclick="this.classList.toggle('flipped')">
+      <div class="flashcard-inner">
+        <div class="flashcard-front">
+          <div class="q-label">Question ${i + 1}</div>
+          <p>${card.q}</p>
+          <div class="flashcard-hint">Click to reveal answer</div>
+        </div>
+        <div class="flashcard-back">
+          <div class="a-label">Answer</div>
+          <p>${card.a}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function shuffleCards() {
+  for (let i = flashcardData.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [flashcardData[i], flashcardData[j]] = [flashcardData[j], flashcardData[i]];
+  }
+  renderCards();
+}
+
+renderCards();
+
+// ═══════════ FAQ DATA ═══════════
+const faqData = [
+  {
+    q: 'git add * does not add the .github/workflows folder — why?',
+    tag: 'Git',
+    a: '<code>git add *</code> uses shell globbing which skips files and folders starting with a dot (like <code>.github/</code> and <code>.gitignore</code>). Use <code>git add .</code> instead — the dot tells git to add the current directory recursively, including all dotfiles and dotfolders.'
+  },
+  {
+    q: 'Does git add . also include .env and node_modules?',
+    tag: 'Git',
+    a: 'No! <code>git add .</code> respects your <code>.gitignore</code> file. If <code>.env</code> and <code>node_modules/</code> are listed in .gitignore, they will NEVER be staged or committed regardless of which git add variant you use.'
+  },
+  {
+    q: '.DS_Store keeps showing up in my commits',
+    tag: 'Git',
+    a: 'macOS creates .DS_Store files automatically. Add <code>.DS_Store</code> to your <code>.gitignore</code>. If already tracked, un-track it with <code>git rm --cached .DS_Store</code> first, then add to .gitignore and commit.'
+  },
+  {
+    q: 'My PR says "Waiting for status to be reported" and is stuck',
+    tag: 'GitHub Actions',
+    a: 'The workflow file (pr-master.yml) exists on the <code>test</code> branch but not on <code>master</code> yet. GitHub needs the workflow registered on the target branch. Fix: temporarily disable "Require status checks" in your ruleset, merge the PR (gets workflow onto master), then re-enable the check.'
+  },
+  {
+    q: 'I can\'t add myself as a reviewer on my own PR',
+    tag: 'GitHub',
+    a: 'GitHub doesn\'t allow the PR author to also be a reviewer. For solo projects, go to Settings → Rules → Rulesets → your master ruleset, and set "Required approvals" to 0. You still get CI checks without needing a human reviewer.'
+  },
+  {
+    q: 'printf \'%s\' broke my SSH key — "error in libcrypto"',
+    tag: 'SSH / Deploy',
+    a: '<code>printf \'%s\'</code> strips the trailing newline, but SSH private keys MUST end with a newline for OpenSSL to parse them. Use <code>echo "$KEY" > keyfile</code> instead — echo automatically adds the trailing newline that SSH keys need.'
+  },
+  {
+    q: 'pm2 restart doesn\'t pick up my new PORT or working directory',
+    tag: 'pm2',
+    a: '<code>pm2 restart</code> reuses the ORIGINAL saved cwd and environment from when the process was FIRST created. If those were wrong, restart keeps the bad settings forever. Fix: use <code>pm2 delete app && pm2 start app</code> for a clean slate every time.'
+  },
+  {
+    q: 'PORT=3001 pm2 start doesn\'t actually set the port',
+    tag: 'pm2',
+    a: 'The inline environment variable syntax <code>PORT=3001 pm2 start</code> sets PORT for the pm2 process itself, but pm2 spawns Node.js as a child process that may not inherit it. Use an ecosystem.config.js file with <code>env: { PORT: 5001 }</code> — this is the reliable way to pass env vars through pm2.'
+  },
+  {
+    q: 'Cannot find module \'express\' on the server',
+    tag: 'Deploy',
+    a: 'The <code>node_modules</code> folder is missing on the server. <code>rsync --exclude=\'node_modules\' --delete</code> deliberately skips node_modules. The server\'s <code>npm ci --omit=dev</code> command needs to run BEFORE pm2 starts. Check that the commands are chained with <code>&&</code> so they run in sequence.'
+  },
+  {
+    q: 'Nested heredoc fails in GitHub Actions (ENDSSH with EOF inside)',
+    tag: 'GitHub Actions',
+    a: 'GitHub Actions runs shell steps in bash where nested heredocs (<code>&lt;&lt; \'ENDSSH\'</code> with <code>&lt;&lt; \'EOF\'</code> inside) don\'t parse reliably. Fix: use a single-line SSH command with <code>&&</code> to chain operations, or use <code>echo</code> to write config files instead of heredocs.'
+  },
+  {
+    q: 'Port conflict — something else already running on port 3001',
+    tag: 'Server',
+    a: 'Your droplet had another service on port 3001. Always check what\'s running first with <code>pm2 list</code> or <code>lsof -i :3001</code>. We switched to ports 5000 (test) and 5001 (master) to avoid conflicts with existing services.'
+  },
+  {
+    q: 'The pipeline installs npm packages on the runner but rsync skips them — why?',
+    tag: 'Pipeline Optimization',
+    a: 'Redundant work! <code>npm ci --omit=dev</code> on the runner installs node_modules, but <code>rsync --exclude=\'node_modules\'</code> skips them. Then the server runs <code>npm ci</code> again. The runner install is wasted time. Remove it — only install on the server where the app actually runs.'
+  },
+  {
+    q: 'Are GitHub Secrets actually hidden? Can they leak in logs?',
+    tag: 'Security',
+    a: 'GitHub masks secret values in logs on a best-effort basis, but it\'s NOT a guarantee. Partial values, base64-encoded values, or split strings can still appear. NEVER intentionally echo or log secrets in your workflow scripts.'
+  }
+];
+
+function renderFAQ() {
+  const container = document.getElementById('faq-container');
+  container.innerHTML = faqData.map((item, i) => `
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        <span>${item.q} <span class="faq-tag">${item.tag}</span></span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="faq-a">${item.a}</div>
+    </div>
+  `).join('');
+}
+
+function toggleFaq(el) {
+  const isOpen = el.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.faq-q').forEach(q => q.classList.remove('open'));
+  document.querySelectorAll('.faq-a').forEach(a => a.classList.remove('open'));
+  if (!isOpen) {
+    el.classList.add('open');
+    el.nextElementSibling.classList.add('open');
+  }
+}
+
+renderFAQ();
+
+// ═══════════ SCROLL REVEAL ═══════════
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 01 — Quiz (60 Questions)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.7; }
+
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 6px; transition: background .2s; }
+  nav a:hover { background: rgba(88,166,255,.15); }
+  nav .title { font-weight: 700; color: var(--text); font-size: 16px; margin-right: auto; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  h1 { font-size: 2em; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { color: var(--muted); font-size: 1em; margin-bottom: 32px; }
+
+  /* PROGRESS BAR */
+  .progress-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; position: sticky; top: 52px; z-index: 50; }
+  .progress-bar-bg { background: var(--bg); border-radius: 8px; height: 12px; overflow: hidden; margin: 8px 0; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 8px; transition: width .4s ease; width: 0%; }
+  .progress-stats { display: flex; justify-content: space-between; font-size: .85em; color: var(--muted); }
+  .progress-stats .correct { color: var(--green); }
+  .progress-stats .wrong { color: var(--red); }
+
+  /* QUESTION CARD */
+  .question-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; transition: border-color .3s; }
+  .question-card.answered-correct { border-color: var(--green); }
+  .question-card.answered-wrong { border-color: var(--red); }
+  .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .q-number { color: var(--accent); font-weight: 700; font-size: .85em; }
+  .q-category { background: rgba(88,166,255,.12); color: var(--accent); font-size: .7em; padding: 3px 10px; border-radius: 12px; }
+  .q-text { font-size: 1.05em; font-weight: 500; margin-bottom: 16px; line-height: 1.6; }
+  .q-text code { background: var(--bg); padding: 2px 8px; border-radius: 4px; font-family: 'Fira Code', Consolas, monospace; font-size: .9em; color: var(--purple); }
+
+  /* OPTIONS */
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option { padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all .2s; display: flex; gap: 12px; align-items: flex-start; }
+  .option:hover:not(.disabled) { border-color: var(--accent); background: rgba(88,166,255,.06); }
+  .option.selected { border-color: var(--accent); background: rgba(88,166,255,.1); }
+  .option.correct { border-color: var(--green); background: rgba(63,185,80,.1); }
+  .option.wrong { border-color: var(--red); background: rgba(248,81,73,.1); }
+  .option.disabled { cursor: default; opacity: .7; }
+  .option.disabled.correct { opacity: 1; }
+  .option .letter { min-width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .8em; font-weight: 700; flex-shrink: 0; transition: all .2s; }
+  .option.selected .letter { border-color: var(--accent); color: var(--accent); }
+  .option.correct .letter { border-color: var(--green); color: var(--green); background: rgba(63,185,80,.15); }
+  .option.wrong .letter { border-color: var(--red); color: var(--red); background: rgba(248,81,73,.15); }
+  .option-text { font-size: .95em; line-height: 1.5; }
+
+  /* EXPLANATION */
+  .explanation { margin-top: 12px; padding: 12px 16px; background: var(--bg); border-radius: 8px; border-left: 3px solid var(--green); font-size: .9em; color: var(--muted); line-height: 1.6; display: none; }
+  .explanation.show { display: block; }
+  .explanation code { background: rgba(88,166,255,.1); padding: 1px 6px; border-radius: 3px; font-family: monospace; color: var(--accent); font-size: .9em; }
+
+  /* RESULTS */
+  .results-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; text-align: center; margin: 40px 0; display: none; }
+  .results-section.show { display: block; }
+  .results-score { font-size: 3em; font-weight: 700; margin: 16px 0; }
+  .results-score.great { color: var(--green); }
+  .results-score.good { color: var(--accent); }
+  .results-score.okay { color: var(--orange); }
+  .results-score.poor { color: var(--red); }
+  .results-msg { color: var(--muted); font-size: 1.1em; margin-bottom: 24px; }
+  .results-breakdown { display: flex; justify-content: center; gap: 40px; margin: 20px 0; }
+  .results-breakdown div { text-align: center; }
+  .results-breakdown .num { font-size: 2em; font-weight: 700; }
+  .results-breakdown .label { font-size: .85em; color: var(--muted); }
+
+  /* BUTTONS */
+  .btn { padding: 10px 28px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .controls { display: flex; gap: 12px; justify-content: center; margin: 32px 0; flex-wrap: wrap; }
+
+  /* FILTER */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .filter-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; background: transparent; color: var(--muted); cursor: pointer; font-size: .8em; transition: all .2s; }
+  .filter-btn:hover, .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.1); }
+
+  @media (max-width: 768px) {
+    .q-text { font-size: .95em; }
+    h1 { font-size: 1.5em; }
+    nav { padding: 8px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📝 Lecture 01 — Quiz</span>
+  <a href="index.html">← Back to Lecture</a>
+  <a href="#" onclick="scrollToTop(); return false;">Top</a>
+</nav>
+
+<div class="container">
+
+<h1>CI/CD Pipeline Quiz</h1>
+<p class="subtitle">60 multiple choice questions — test everything you learned in Lecture 01</p>
+
+<!-- PROGRESS -->
+<div class="progress-container" id="progress-box">
+  <div class="progress-stats">
+    <span>Answered: <strong id="answered-count">0</strong> / <strong id="total-count">60</strong></span>
+    <span class="correct">✅ <strong id="correct-count">0</strong></span>
+    <span class="wrong">❌ <strong id="wrong-count">0</strong></span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progress-fill"></div>
+  </div>
+</div>
+
+<!-- FILTER -->
+<div class="filter-bar" id="filter-bar"></div>
+
+<!-- QUESTIONS -->
+<div id="questions-container"></div>
+
+<!-- RESULTS -->
+<div class="results-section" id="results">
+  <h2>🎉 Quiz Complete!</h2>
+  <div class="results-score" id="results-score">0%</div>
+  <div class="results-msg" id="results-msg"></div>
+  <div class="results-breakdown">
+    <div><div class="num" style="color:var(--green)" id="res-correct">0</div><div class="label">Correct</div></div>
+    <div><div class="num" style="color:var(--red)" id="res-wrong">0</div><div class="label">Wrong</div></div>
+    <div><div class="num" style="color:var(--muted)" id="res-skip">0</div><div class="label">Skipped</div></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-secondary" onclick="showWrong()">Show Wrong Answers</button>
+    <button class="btn btn-primary" onclick="resetQuiz()">Try Again</button>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="finishQuiz()">Finish & See Results</button>
+  <button class="btn btn-secondary" onclick="resetQuiz()">Reset Quiz</button>
+</div>
+
+</div>
+
+<script>
+const questions = [
+  // ─── CI/CD BASICS ───
+  {
+    cat: 'CI/CD Basics',
+    q: 'What does CI stand for?',
+    opts: ['Continuous Installation', 'Continuous Integration', 'Code Inspection', 'Centralized Infrastructure'],
+    ans: 1,
+    exp: 'CI = Continuous Integration. It means automatically running tests every time new code is pushed.'
+  },
+  {
+    cat: 'CI/CD Basics',
+    q: 'What does CD stand for in CI/CD?',
+    opts: ['Continuous Development', 'Code Delivery', 'Continuous Deployment / Continuous Delivery', 'Change Detection'],
+    ans: 2,
+    exp: 'CD = Continuous Deployment or Continuous Delivery. Automatically deploying code after tests pass.'
+  },
+  {
+    cat: 'CI/CD Basics',
+    q: 'What is the main purpose of a CI pipeline?',
+    opts: ['To deploy code to production', 'To catch bugs early by running tests automatically', 'To merge branches together', 'To manage project dependencies'],
+    ans: 1,
+    exp: 'CI catches bugs early by running automated tests on every push — before the code reaches production.'
+  },
+  {
+    cat: 'CI/CD Basics',
+    q: 'In our project, what happens first: testing or deployment?',
+    opts: ['Deployment, then testing', 'Testing, then deployment', 'They run at the same time', 'Deployment only, no testing'],
+    ans: 1,
+    exp: 'Tests run first. The deploy job uses "needs: test" and "if: success()" to only deploy after tests pass.'
+  },
+  {
+    cat: 'CI/CD Basics',
+    q: 'Why is automation better than manual deployment?',
+    opts: ['It\'s slower but more reliable', 'Humans never make mistakes', 'It eliminates human error, is consistent, and saves time', 'It gives you more control over each step'],
+    ans: 2,
+    exp: 'Automation eliminates human error, ensures consistent deployments, and frees up developer time.'
+  },
+  // ─── GITHUB ACTIONS ───
+  {
+    cat: 'GitHub Actions',
+    q: 'Where must GitHub Actions workflow files be stored?',
+    opts: ['.git/workflows/', '.github/actions/', '.github/workflows/', 'workflows/'],
+    ans: 2,
+    exp: 'All workflow files must be in the .github/workflows/ directory with a .yml or .yaml extension.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What file format do GitHub Actions workflows use?',
+    opts: ['JSON', 'TOML', 'YAML (.yml)', 'XML'],
+    ans: 2,
+    exp: 'Workflows are written in YAML format using .yml or .yaml file extensions.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What is a "runner" in GitHub Actions?',
+    opts: ['A developer who runs the tests', 'A Docker container on your machine', 'A temporary virtual machine provided by GitHub', 'A GitHub bot'],
+    ans: 2,
+    exp: 'A runner is a temporary VM that GitHub creates fresh for each workflow run. It has an empty filesystem and no history.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What does <code>runs-on: ubuntu-latest</code> specify?',
+    opts: ['The repository must be on Ubuntu', 'The job runs on the latest Ubuntu runner VM', 'Ubuntu must be installed locally', 'The server must run Ubuntu'],
+    ans: 1,
+    exp: 'It tells GitHub Actions to use a fresh Ubuntu virtual machine to run the job.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What does <code>actions/checkout@v4</code> do?',
+    opts: ['Checks out a library from npm', 'Downloads your repo code onto the runner', 'Creates a new branch', 'Runs a code review'],
+    ans: 1,
+    exp: 'It clones your repository code onto the runner VM. Without it, the runner has no files to work with.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What does <code>actions/setup-node@v4</code> do?',
+    opts: ['Deploys Node.js on your production server', 'Installs Node.js on the runner VM', 'Creates a Node.js project', 'Installs npm packages'],
+    ans: 1,
+    exp: 'It installs a specific version of Node.js on the runner. The runner needs Node.js to run npm commands.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'What does <code>cache: \'npm\'</code> do in setup-node?',
+    opts: ['Caches the entire node_modules across runs', 'Caches the npm package download cache (~/.npm)', 'Creates a backup of package.json', 'Disables cache for faster installs'],
+    ans: 1,
+    exp: 'It caches the npm download cache between runs. Packages don\'t need to be re-downloaded, making npm ci faster.'
+  },
+  {
+    cat: 'GitHub Actions',
+    q: 'How many workflow files does our project have?',
+    opts: ['1', '2', '3', '4'],
+    ans: 2,
+    exp: 'Three: test-branch.yml (test branch CI/CD), pr-master.yml (PR gate), deploy-master.yml (master deploy).'
+  },
+  // ─── TRIGGERS ───
+  {
+    cat: 'Triggers',
+    q: 'What does <code>on: push: branches: [test]</code> mean?',
+    opts: ['Run when any branch is pushed', 'Run only when code is pushed to the test branch', 'Run when a test file is modified', 'Run tests on every push'],
+    ans: 1,
+    exp: 'The workflow only triggers when code is pushed to the "test" branch specifically.'
+  },
+  {
+    cat: 'Triggers',
+    q: 'What event triggers deploy-master.yml?',
+    opts: ['pull_request to master', 'push to master', 'push to test', 'Manual trigger only'],
+    ans: 1,
+    exp: 'Push to master — but since direct pushes are blocked by branch protection, this only happens from merged PRs.'
+  },
+  {
+    cat: 'Triggers',
+    q: 'What event triggers pr-master.yml?',
+    opts: ['push to master', 'push to test', 'pull_request targeting master', 'Every commit on any branch'],
+    ans: 2,
+    exp: 'It triggers when a Pull Request is opened (or updated) that targets the master branch.'
+  },
+  {
+    cat: 'Triggers',
+    q: 'If branch protection blocks direct pushes to master, how does deploy-master.yml trigger?',
+    opts: ['Manual dispatch', 'Merging a PR creates a push event on master', 'It doesn\'t — it relies on pr-master.yml', 'Cron schedule'],
+    ans: 1,
+    exp: 'When you merge a PR, GitHub creates a merge commit on master — this is a push event that triggers the workflow.'
+  },
+  // ─── JOBS & STEPS ───
+  {
+    cat: 'Jobs & Steps',
+    q: 'What is a "job" in GitHub Actions?',
+    opts: ['A single command', 'A group of steps that run on the same machine', 'Another name for a workflow', 'A deployment target'],
+    ans: 1,
+    exp: 'A job is a group of steps that all run on the same runner (VM). A workflow can have multiple jobs.'
+  },
+  {
+    cat: 'Jobs & Steps',
+    q: 'By default, do jobs run in parallel or sequentially?',
+    opts: ['Sequentially (one after another)', 'In parallel (at the same time)', 'It depends on the runner', 'Always one at a time'],
+    ans: 1,
+    exp: 'Jobs run in parallel by default. Use "needs:" to create a dependency chain and force sequential execution.'
+  },
+  {
+    cat: 'Jobs & Steps',
+    q: 'What does <code>needs: test</code> do in a job definition?',
+    opts: ['Imports test utilities', 'Makes the job wait for the "test" job to finish first', 'Automatically runs npm test', 'Requires a specific version of Node'],
+    ans: 1,
+    exp: '"needs: test" means this job waits for the "test" job to finish. It creates a dependency chain.'
+  },
+  {
+    cat: 'Jobs & Steps',
+    q: 'What does <code>if: success()</code> do?',
+    opts: ['Marks the job as successful', 'Only runs the job if all dependent jobs passed', 'Logs a success message', 'Retries on failure'],
+    ans: 1,
+    exp: '"if: success()" means only run this job if all jobs listed in "needs:" completed successfully.'
+  },
+  {
+    cat: 'Jobs & Steps',
+    q: 'What is the difference between <code>uses:</code> and <code>run:</code> in a step?',
+    opts: ['uses: runs npm, run: runs shell commands', 'uses: runs a pre-built action, run: runs a shell command', 'They are the same thing', 'uses: is for Node, run: is for Python'],
+    ans: 1,
+    exp: '"uses:" runs a pre-built action (like checkout or setup-node). "run:" executes a shell command directly.'
+  },
+  {
+    cat: 'Jobs & Steps',
+    q: 'Do steps inside a job run in parallel or sequentially?',
+    opts: ['In parallel', 'Sequentially (one after another)', 'Randomly', 'It depends on the number of runners'],
+    ans: 1,
+    exp: 'Steps always run sequentially, one at a time, in the order they appear in the workflow file.'
+  },
+  // ─── SECRETS ───
+  {
+    cat: 'Secrets',
+    q: 'How do you reference a secret in a workflow file?',
+    opts: ['$SECRET_NAME', 'env.SECRET_NAME', '${{ secrets.SECRET_NAME }}', 'process.env.SECRET_NAME'],
+    ans: 2,
+    exp: 'Secrets are referenced with ${{ secrets.NAME }}. They are injected by GitHub at runtime.'
+  },
+  {
+    cat: 'Secrets',
+    q: 'Where are GitHub Secrets stored?',
+    opts: ['In the workflow YAML file', 'In the .env file', 'In GitHub repo Settings → Secrets and variables → Actions', 'In the package.json'],
+    ans: 2,
+    exp: 'Secrets are encrypted and stored in the GitHub repo settings under Secrets and Variables → Actions.'
+  },
+  {
+    cat: 'Secrets',
+    q: 'Are GitHub secret values guaranteed to be hidden in Action logs?',
+    opts: ['Yes, always 100%', 'No — masking is best-effort, partial values can leak', 'Only if you use the mask command', 'They are never hidden'],
+    ans: 1,
+    exp: 'GitHub masks secrets on a best-effort basis. Partial values, base64 encoding, or string splitting can still expose them.'
+  },
+  {
+    cat: 'Secrets',
+    q: 'Which of these should be stored as a secret?',
+    opts: ['Node.js version number', 'Branch name', 'SSH private key for the server', 'The name of the npm test command'],
+    ans: 2,
+    exp: 'SSH private keys, passwords, API tokens — any sensitive value that shouldn\'t be visible in code or logs.'
+  },
+  // ─── NPM ───
+  {
+    cat: 'npm',
+    q: 'What is the difference between <code>npm install</code> and <code>npm ci</code>?',
+    opts: ['npm ci is older', 'npm ci does a clean install from lock file, npm install may update it', 'They are identical', 'npm install is faster'],
+    ans: 1,
+    exp: 'npm ci deletes node_modules, installs exact versions from package-lock.json. npm install may update the lock file. npm ci is designed for CI.'
+  },
+  {
+    cat: 'npm',
+    q: 'What does <code>npm ci --omit=dev</code> skip?',
+    opts: ['All dependencies', 'Optional dependencies', 'devDependencies like jest and supertest', 'The scripts section'],
+    ans: 2,
+    exp: '--omit=dev skips devDependencies. The server doesn\'t need test tools — only runtime deps like express.'
+  },
+  {
+    cat: 'npm',
+    q: 'Which of these is a devDependency in our project?',
+    opts: ['express', 'node', 'jest', 'pm2'],
+    ans: 2,
+    exp: 'jest (and supertest) are devDependencies — they\'re only needed for testing, not for running the app.'
+  },
+  {
+    cat: 'npm',
+    q: 'Why does our pipeline run <code>npm ci --omit=dev</code> on the server but <code>npm ci</code> (without omit) on the runner?',
+    opts: ['Runner needs all deps to run tests including jest; server only needs express to run the app', 'It\'s a mistake — they should be the same', 'The runner is slower', 'npm ci doesn\'t work on servers'],
+    ans: 0,
+    exp: 'The runner needs jest and supertest to run tests. The server only needs express to run the app — no point installing test tools.'
+  },
+  {
+    cat: 'npm',
+    q: 'What version format does our project use?',
+    opts: ['v1.0.0', '1.0.0 (MAJOR.MINOR.PATCH)', 'year.month.day', 'build-1234'],
+    ans: 1,
+    exp: 'Semantic Versioning: MAJOR.MINOR.PATCH. Patch = bug fixes, Minor = new features, Major = breaking changes.'
+  },
+  // ─── SSH & DEPLOYMENT ───
+  {
+    cat: 'SSH & Deploy',
+    q: 'What does <code>chmod 600</code> do to the SSH key file?',
+    opts: ['Makes it readable by everyone', 'Sets permissions to owner only (read + write)', 'Deletes the file', 'Encrypts the file'],
+    ans: 1,
+    exp: 'chmod 600 = owner read/write only. SSH REFUSES to use key files with loose permissions — this is required.'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'Why is <code>ssh-keyscan</code> needed in the pipeline?',
+    opts: ['To generate new SSH keys', 'To save the server\'s fingerprint so SSH doesn\'t prompt interactively', 'To encrypt the connection', 'To test if the server is online'],
+    ans: 1,
+    exp: 'Without ssh-keyscan, SSH asks "Are you sure you want to connect?" — which hangs forever in an automated CI environment.'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'What does <code>rsync -avz</code> do?',
+    opts: ['Deletes files remotely', 'Archive mode + verbose + compress — copies changed files efficiently', 'Synchronizes databases', 'Creates a zip file'],
+    ans: 1,
+    exp: '-a=archive (preserves permissions/timestamps), -v=verbose (shows progress), -z=compress (saves bandwidth).'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'Why does rsync use <code>--exclude=\'node_modules\'</code>?',
+    opts: ['node_modules causes errors', 'It\'s too large and the server installs its own', 'rsync can\'t handle binary files', 'GitHub doesn\'t allow it'],
+    ans: 1,
+    exp: 'node_modules is huge and platform-specific. The server runs npm ci to get its own native binaries.'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'Why does rsync use <code>--delete</code>?',
+    opts: ['It deletes the local copy after upload', 'It removes every file on the server', 'It removes server files that no longer exist in the repo', 'It\'s required for SSH'],
+    ans: 2,
+    exp: '--delete removes files on the server that were deleted from the repo. Keeps the server clean.'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'Why did <code>printf \'%s\'</code> break our SSH key?',
+    opts: ['printf doesn\'t work on Linux', 'Printf stripped the trailing newline that SSH keys need', 'Printf can\'t handle special characters', 'Printf creates binary output'],
+    ans: 1,
+    exp: 'SSH private keys MUST end with a newline. printf \'%s\' strips it, causing "error in libcrypto". echo preserves it.'
+  },
+  {
+    cat: 'SSH & Deploy',
+    q: 'What does <code>StrictHostKeyChecking=no</code> do?',
+    opts: ['Disables encryption', 'Skips the known_hosts verification', 'Disables password authentication', 'Enables root login'],
+    ans: 1,
+    exp: 'It tells SSH to not verify the server\'s fingerprint. We use ssh-keyscan instead for better security.'
+  },
+  // ─── PM2 ───
+  {
+    cat: 'pm2',
+    q: 'What is pm2?',
+    opts: ['A package manager', 'A process manager for Node.js', 'A version control system', 'A testing framework'],
+    ans: 1,
+    exp: 'pm2 is a process manager that keeps Node.js apps running forever — auto-restarts on crash, manages logs, supports multiple apps.'
+  },
+  {
+    cat: 'pm2',
+    q: 'Why use <code>pm2 delete + start</code> instead of <code>pm2 restart</code>?',
+    opts: ['restart is deprecated', 'restart reuses old cwd and env vars; delete+start gives a clean slate', 'delete is faster', 'restart doesn\'t work with Node.js'],
+    ans: 1,
+    exp: 'pm2 restart reuses the original saved working directory and environment. Delete+start creates a fresh process with current settings.'
+  },
+  {
+    cat: 'pm2',
+    q: 'What does <code>|| true</code> do after <code>pm2 delete pipeline</code>?',
+    opts: ['Forces the delete to work', 'Prevents the script from failing if the app wasn\'t running', 'Confirms the deletion', 'Enables verbose logging'],
+    ans: 1,
+    exp: 'If "pipeline" isn\'t running, pm2 delete fails with an error. || true catches that error so the script continues.'
+  },
+  {
+    cat: 'pm2',
+    q: 'What is ecosystem.config.js used for?',
+    opts: ['Setting up the development environment', 'Reliably passing env vars (like PORT) to pm2-managed apps', 'Configuring the testing framework', 'Managing npm packages'],
+    ans: 1,
+    exp: 'Inline env vars may not be passed to child processes. ecosystem.config.js is the reliable way to set env vars in pm2.'
+  },
+  {
+    cat: 'pm2',
+    q: 'What does <code>pm2 save</code> do?',
+    opts: ['Saves the app\'s code', 'Saves the current list of running processes for auto-restart after reboot', 'Creates a backup', 'Saves logs to a file'],
+    ans: 1,
+    exp: 'pm2 save stores the running process list. On server reboot, pm2 can restore all saved processes automatically.'
+  },
+  {
+    cat: 'pm2',
+    q: 'Why did <code>PORT=5001 pm2 start</code> not work?',
+    opts: ['pm2 doesn\'t support environment variables', 'pm2 spawns Node as a child process that may not inherit inline env vars', 'The port was already in use', 'pm2 only accepts port numbers below 1000'],
+    ans: 1,
+    exp: 'Inline env vars set the variable for the pm2 parent process, but pm2 spawns Node.js as a child that may not inherit them.'
+  },
+  // ─── GIT ───
+  {
+    cat: 'Git',
+    q: 'Why does <code>git add *</code> skip the .github folder?',
+    opts: ['Git ignores all folders', 'The shell\'s * glob skips filenames starting with a dot', '.github is in .gitignore', 'It\'s a Git security feature'],
+    ans: 1,
+    exp: 'Shell globbing with * expands to visible files only — it skips dotfiles/dotfolders. Use git add . instead.'
+  },
+  {
+    cat: 'Git',
+    q: 'What is the correct command to stage ALL files including dotfiles?',
+    opts: ['git add *', 'git add .', 'git add --all-files', 'git stage .'],
+    ans: 1,
+    exp: 'git add . tells git to stage the current directory recursively, including all dotfiles and dotfolders.'
+  },
+  {
+    cat: 'Git',
+    q: 'How do you stop tracking .DS_Store that is already committed?',
+    opts: ['Delete it from Finder', 'git remove .DS_Store', 'git rm --cached .DS_Store, then add to .gitignore', 'git ignore .DS_Store'],
+    ans: 2,
+    exp: 'git rm --cached removes it from Git tracking (but keeps the local file). Then add to .gitignore to prevent future tracking.'
+  },
+  {
+    cat: 'Git',
+    q: 'What does .gitignore do?',
+    opts: ['Deletes files from the repo', 'Tells Git which files/folders to NOT track', 'Hides files in the editor', 'Encrypts sensitive files'],
+    ans: 1,
+    exp: '.gitignore lists patterns of files that Git should ignore — they won\'t be staged, committed, or pushed.'
+  },
+  // ─── BRANCH PROTECTION ───
+  {
+    cat: 'Branch Protection',
+    q: 'What is branch protection?',
+    opts: ['Encrypting the branch', 'Rules that prevent direct pushes, requiring PRs and checks', 'Making a branch read-only forever', 'Locking the repo'],
+    ans: 1,
+    exp: 'Branch protection rules prevent direct pushes to important branches. Code can only enter through Pull Requests that pass checks.'
+  },
+  {
+    cat: 'Branch Protection',
+    q: 'Why did our PR get stuck on "Waiting for status to be reported"?',
+    opts: ['GitHub servers were down', 'The workflow file didn\'t exist on master yet', 'The tests were too slow', 'The secret was missing'],
+    ans: 1,
+    exp: 'GitHub needs the workflow file on the TARGET branch (master). First time, the workflow only exists on test — needs initial merge.'
+  },
+  {
+    cat: 'Branch Protection',
+    q: 'How we fixed the "waiting for status" issue?',
+    opts: ['Replaced the workflow', 'Temporarily disabled the status check, merged PR, then re-enabled', 'Deleted the master branch', 'Changed the trigger'],
+    ans: 1,
+    exp: 'Temporarily disable "Require status checks" in the ruleset, merge the PR (gets workflow onto master), then re-enable.'
+  },
+  {
+    cat: 'Branch Protection',
+    q: 'Why can\'t the PR author be a reviewer on their own PR?',
+    opts: ['GitHub doesn\'t allow it — set required approvals to 0 for solo projects', 'It\'s a billing restriction', 'You need GitHub Enterprise', 'The reviewer role isn\'t enabled'],
+    ans: 0,
+    exp: 'GitHub prevents self-review. For solo projects, set "Required approvals" to 0 in the ruleset to bypass this.'
+  },
+  // ─── SERVER / NGINX ───
+  {
+    cat: 'Server',
+    q: 'Why do we use different ports (5000 and 5001)?',
+    opts: ['One is HTTP, one is HTTPS', 'Both apps run on the same server and need unique ports', 'Port 5000 is for testing only', 'pm2 requires different ports'],
+    ans: 1,
+    exp: 'The test and master apps both run on the same DigitalOcean droplet. Each Node.js process needs its own port.'
+  },
+  {
+    cat: 'Server',
+    q: 'What does Nginx do in our setup?',
+    opts: ['Runs the Node.js app', 'Acts as a reverse proxy — maps domains to ports', 'Manages the database', 'Provides SSL certificates'],
+    ans: 1,
+    exp: 'Nginx receives requests on port 80/443 and routes them: staging.mytown-online.de → port 5000, stable.mytown-online.de → port 5001.'
+  },
+  {
+    cat: 'Server',
+    q: 'Why did we get "Cannot find module express" on the server?',
+    opts: ['Express wasn\'t in package.json', 'node_modules was excluded by rsync and npm ci hadn\'t run yet', 'The wrong Node version was installed', 'Express was deprecated'],
+    ans: 1,
+    exp: 'rsync --exclude=\'node_modules\' skips that folder. The server needs npm ci --omit=dev to install its own dependencies before pm2 starts.'
+  },
+  {
+    cat: 'Server',
+    q: 'What caused the port conflict on our droplet?',
+    opts: ['Two Node apps tried to use the same port', 'Nginx was broken', 'SSH was using the port', 'The firewall blocked it'],
+    ans: 0,
+    exp: 'Another service was already running on port 3001. We changed to ports 5000 and 5001 to avoid the conflict.'
+  },
+  {
+    cat: 'Server',
+    q: 'Why does the deploy script use <code>mkdir -p</code> before rsync?',
+    opts: ['To create a backup folder', 'To ensure the deployment directory exists (especially on first deploy)', 'mkdir is required for rsync', 'To create the SSH directory'],
+    ans: 1,
+    exp: 'On the first deployment, /var/www/pipeline doesn\'t exist yet. mkdir -p creates it without error if it already exists.'
+  },
+  // ─── WORKFLOW SPECIFICS ───
+  {
+    cat: 'Workflow Files',
+    q: 'What does pr-master.yml deploy?',
+    opts: ['To the test server', 'To the master server', 'Nothing — it only runs tests', 'To a staging area'],
+    ans: 2,
+    exp: 'pr-master.yml is a gate — it ONLY runs tests to check if the PR is safe to merge. No deployment happens.'
+  },
+  {
+    cat: 'Workflow Files',
+    q: 'Why does deploy-master.yml run tests even though pr-master.yml already tested?',
+    opts: ['It\'s redundant — should be removed', 'Tests could fail with different merge conflicts; it\'s a safety net', 'GitHub requires it', 'Only one workflow can run tests'],
+    ans: 1,
+    exp: 'PR tests ran on the branch. After merging, the combined code could have new issues. The deploy workflow tests the merged result as a safety net.'
+  },
+  {
+    cat: 'Workflow Files',
+    q: 'Why did nested heredocs fail in our GitHub Actions workflow?',
+    opts: ['YAML doesn\'t support heredocs', 'Bash on GitHub runners can\'t parse heredoc-inside-heredoc reliably', 'The SSH connection dropped', 'GitHub has a line limit'],
+    ans: 1,
+    exp: 'Nested heredocs (ENDSSH with EOF inside) don\'t parse correctly in GitHub Actions bash steps. We switched to single commands with echo.'
+  },
+  {
+    cat: 'Workflow Files',
+    q: 'What is the <code>name:</code> field at the top of a workflow file?',
+    opts: ['The filename', 'A display label shown in the GitHub Actions tab', 'A required unique identifier', 'The branch name'],
+    ans: 1,
+    exp: 'It\'s a human-readable label that appears in the Actions tab on GitHub. It helps you identify workflows.'
+  },
+  {
+    cat: 'Workflow Files',
+    q: 'How does our test-branch pipeline pass CONFIG to the server?',
+    opts: ['Through package.json', 'Via GitHub Secrets injected as environment variables', 'Hardcoded in the workflow', 'Through a .env file'],
+    ans: 1,
+    exp: 'Secrets (server IP, SSH key, username) are stored in GitHub Settings and injected via ${{ secrets.NAME }} at runtime.'
+  },
+  // ─── ADDITIONAL CONCEPTS ───
+  {
+    cat: 'Version Control',
+    q: 'What is semantic versioning?',
+    opts: ['A way to name branches', 'MAJOR.MINOR.PATCH version numbering system', 'Version control for databases', 'A Git branching strategy'],
+    ans: 1,
+    exp: 'Semantic versioning uses MAJOR.MINOR.PATCH: Major = breaking changes, Minor = new features, Patch = bug fixes.'
+  },
+  {
+    cat: 'Version Control',
+    q: 'In version 2.4.1, what does the "4" represent?',
+    opts: ['Major version', 'Minor version', 'Patch version', 'Build number'],
+    ans: 1,
+    exp: 'The second number is the MINOR version — incremented when new features are added without breaking existing ones.'
+  },
+  {
+    cat: 'Testing',
+    q: 'What testing tools does our project use?',
+    opts: ['Mocha + Chai', 'Jest + Supertest', 'Jasmine + Karma', 'Vitest + Playwright'],
+    ans: 1,
+    exp: 'Jest is the test runner framework, and Supertest is for making HTTP requests to the Express app during tests.'
+  },
+  {
+    cat: 'Testing',
+    q: 'How many tests does our project have?',
+    opts: ['5', '8', '11', '15'],
+    ans: 2,
+    exp: 'The project has 11 tests covering CRUD operations, authentication, and error cases.'
+  },
+  {
+    cat: 'Testing',
+    q: 'If a test fails in the test job, what happens to the deploy job?',
+    opts: ['Deploy runs anyway', 'Deploy is skipped entirely', 'Deploy runs but with a warning', 'The entire workflow restarts'],
+    ans: 1,
+    exp: 'The deploy job has "needs: test" and "if: success()". If the test job fails, the deploy job is skipped completely.'
+  },
+  {
+    cat: 'Node.js',
+    q: 'What does <code>process.env.PORT || 5000</code> mean?',
+    opts: ['Always use port 5000', 'Use the PORT environment variable if set, otherwise default to 5000', 'Use both ports', 'PORT must equal 5000'],
+    ans: 1,
+    exp: 'The || operator provides a fallback. If PORT is set (e.g., by pm2), use that. Otherwise, default to 5000.'
+  },
+  {
+    cat: 'Node.js',
+    q: 'Why does our server.js include debug startup logs?',
+    opts: ['For performance monitoring', 'To help diagnose deployment issues (wrong PORT, wrong directory)', 'They\'re required by Express', 'For security auditing'],
+    ans: 1,
+    exp: 'Debug logs show the PORT, __dirname, and cwd at startup — making it easy to spot issues like wrong port or wrong directory.'
+  },
+  {
+    cat: 'Security',
+    q: 'Why should you NEVER hardcode server credentials in workflow files?',
+    opts: ['It\'s slower', 'Workflow files are in the repo — anyone with access can see them', 'GitHub doesn\'t allow it', 'It causes syntax errors'],
+    ans: 1,
+    exp: 'Workflow files are committed to the repo. Anyone with repo access (or if the repo is public) would see the credentials. Use Secrets instead.'
+  },
+  {
+    cat: 'General',
+    q: 'What is the purpose of <code>.github/workflows/</code> specifically having a dot prefix?',
+    opts: ['It\'s a GitHub naming convention for special directories', 'GitHub requires folders to start with dots', 'To hide it from IDEs', 'To make it read-only'],
+    ans: 0,
+    exp: '.github/ is GitHub\'s special directory for repo configuration (workflows, issue templates, etc.). The dot is a convention for config directories.'
+  },
+];
+
+// ═══════════ QUIZ ENGINE ═══════════
+let answered = {};
+let score = { correct: 0, wrong: 0 };
+let activeFilter = 'All';
+
+function getCategories() {
+  const cats = new Set(questions.map(q => q.cat));
+  return ['All', ...cats];
+}
+
+function renderFilters() {
+  const bar = document.getElementById('filter-bar');
+  const cats = getCategories();
+  bar.innerHTML = cats.map(c => `<button class="filter-btn ${c === activeFilter ? 'active' : ''}" onclick="filterBy('${c}')">${c}</button>`).join('');
+}
+
+function filterBy(cat) {
+  activeFilter = cat;
+  renderFilters();
+  renderQuestions();
+}
+
+function renderQuestions() {
+  const container = document.getElementById('questions-container');
+  const letters = ['A', 'B', 'C', 'D'];
+
+  const filtered = questions.map((q, i) => ({ ...q, idx: i })).filter(q => activeFilter === 'All' || q.cat === activeFilter);
+
+  container.innerHTML = filtered.map(q => {
+    const i = q.idx;
+    const state = answered[i];
+    const cardClass = state === 'correct' ? 'answered-correct' : state === 'wrong' ? 'answered-wrong' : '';
+
+    return `
+      <div class="question-card ${cardClass}" id="q-${i}">
+        <div class="q-header">
+          <span class="q-number">Q${i + 1}</span>
+          <span class="q-category">${q.cat}</span>
+        </div>
+        <div class="q-text">${q.q}</div>
+        <div class="options">
+          ${q.opts.map((opt, oi) => {
+            let cls = 'option';
+            if (state) {
+              cls += ' disabled';
+              if (oi === q.ans) cls += ' correct';
+              if (state === 'wrong' && oi === answered[i + '_choice']) cls += ' wrong';
+            }
+            return `<div class="${cls}" onclick="answer(${i}, ${oi})">
+              <div class="letter">${letters[oi]}</div>
+              <div class="option-text">${opt}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="explanation ${state ? 'show' : ''}">${q.exp}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function answer(qIdx, choice) {
+  if (answered[qIdx]) return;
+
+  const correct = questions[qIdx].ans === choice;
+  answered[qIdx] = correct ? 'correct' : 'wrong';
+  answered[qIdx + '_choice'] = choice;
+
+  if (correct) score.correct++;
+  else score.wrong++;
+
+  updateProgress();
+  renderQuestions();
+
+  // Scroll card into full view
+  setTimeout(() => {
+    const card = document.getElementById('q-' + qIdx);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+}
+
+function updateProgress() {
+  const total = questions.length;
+  const answeredCount = score.correct + score.wrong;
+  const pct = (answeredCount / total * 100).toFixed(0);
+
+  document.getElementById('answered-count').textContent = answeredCount;
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('correct-count').textContent = score.correct;
+  document.getElementById('wrong-count').textContent = score.wrong;
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+function finishQuiz() {
+  const total = questions.length;
+  const answeredCount = score.correct + score.wrong;
+  const skipped = total - answeredCount;
+  const pct = total > 0 ? Math.round(score.correct / total * 100) : 0;
+
+  document.getElementById('results-score').textContent = pct + '%';
+  document.getElementById('res-correct').textContent = score.correct;
+  document.getElementById('res-wrong').textContent = score.wrong;
+  document.getElementById('res-skip').textContent = skipped;
+
+  const scoreEl = document.getElementById('results-score');
+  scoreEl.className = 'results-score ' + (pct >= 90 ? 'great' : pct >= 70 ? 'good' : pct >= 50 ? 'okay' : 'poor');
+
+  const msgs = {
+    great: '🏆 Outstanding! You really understand CI/CD pipelines!',
+    good: '👍 Great job! Review the missed questions and you\'ll master it.',
+    okay: '📚 Good start! Re-read the lecture and try again.',
+    poor: '💪 Keep going! Review the lecture material and give it another shot.'
+  };
+  document.getElementById('results-msg').textContent = msgs[pct >= 90 ? 'great' : pct >= 70 ? 'good' : pct >= 50 ? 'okay' : 'poor'];
+
+  document.getElementById('results').classList.add('show');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+function showWrong() {
+  filterBy('All');
+  setTimeout(() => {
+    const wrongQ = Object.keys(answered).find(k => answered[k] === 'wrong' && !k.includes('_choice'));
+    if (wrongQ) {
+      const el = document.getElementById('q-' + wrongQ);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 100);
+}
+
+function resetQuiz() {
+  answered = {};
+  score = { correct: 0, wrong: 0 };
+  activeFilter = 'All';
+  document.getElementById('results').classList.remove('show');
+  updateProgress();
+  renderFilters();
+  renderQuestions();
+  scrollToTop();
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// INIT
+renderFilters();
+renderQuestions();
+updateProgress();
+</script>
+
+</body>
+</html>
