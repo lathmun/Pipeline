@@ -91,12 +91,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Step 4: Run the test suite.
-      # This executes whatever is in the "test" script in package.json.
+      # Step 4: Run the test suite WITH COVERAGE.
+      # --coverage tells Jest to track which lines of code the tests execute.
+      # It generates an HTML report in the coverage/ folder that shows:
+      #   - Total % of code covered
+      #   - Per-file and per-line coverage (green = covered, red = not covered)
       # If any test fails, this step exits with a non-zero code,
       # which causes the entire job to fail.
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      # Step 5: Upload the single-file HTML coverage report as a downloadable artifact.
+      # After the pipeline finishes, download from the Actions tab:
+      #   Actions → workflow run → Artifacts section → "coverage-report"
+      # This one HTML file contains total %, per-file %, and line-by-line highlighting.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/coverage-report.html
+          retention-days: 30
 
   # ---------------------------------------------------------------------------
   # JOB 2: DEPLOY TO TEST SERVER
@@ -151,6 +166,8 @@ jobs:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
           TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          AUTH_USER: ${{ secrets.AUTH_USER }}
+          AUTH_PASS: ${{ secrets.AUTH_PASS }}
         run: |
           echo "Deploying to test server..."
 
@@ -183,7 +200,7 @@ jobs:
           #   -z = compress during transfer (saves bandwidth)
           #   --exclude = skip folders not needed on server
           #   --delete = remove files on server that no longer exist in repo
-          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --delete \
+          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --exclude='docs' --exclude='scripts' --exclude='coverage' --exclude='.env' --exclude='.env.example' --exclude='.github' --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipeline/
 
@@ -191,7 +208,8 @@ jobs:
           # WHY delete+start instead of restart?
           #   pm2 restart reuses the ORIGINAL cwd and env from when the process was first created.
           #   delete+start ensures a clean slate with correct settings every deploy.
+          # Write ecosystem.config.js with PORT + AUTH credentials from GitHub Secrets
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipeline && npm ci --omit=dev && (pm2 delete pipeline 2>/dev/null || true) && pm2 start src/server.js --name pipeline"
+            "cd /var/www/pipeline && npm ci --omit=dev && (pm2 delete pipeline 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipeline\",script:\"src/server.js\",env:{PORT:5000,AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
 
           echo "✅ Deployment to test server complete"

@@ -42,9 +42,9 @@ try {
   process.exit(1);
 }
 
-// Get the bump type from command line argument (default: patch)
+// Get the bump type from command line argument
 // process.argv[0] = "node", process.argv[1] = "script.js", process.argv[2] = the argument
-const bumpType = process.argv[2] || 'patch';
+const bumpType = process.argv[2];
 
 // Show help if --help or -h is passed
 if (bumpType === '--help' || bumpType === '-h') {
@@ -56,11 +56,16 @@ if (bumpType === '--help' || bumpType === '-h') {
   console.log('  major   1.0.0 → 2.0.0   (breaking changes)');
   console.log('');
   console.log('npm shortcuts:');
-  console.log('  npm run bump:patch');
-  console.log('  npm run bump:minor');
-  console.log('  npm run bump:major');
-  console.log('');
-  console.log('If no type is given, defaults to "patch".');
+  console.log('  npm run bump            Show current version');
+  console.log('  npm run bump:patch      Bump patch version');
+  console.log('  npm run bump:minor      Bump minor version');
+  console.log('  npm run bump:major      Bump major version');
+  process.exit(0);
+}
+
+// If no argument given, show current version and exit
+if (!bumpType) {
+  console.log(`Current version: v${versionData.version} (${versionData.date} ${versionData.time})`);
   process.exit(0);
 }
 

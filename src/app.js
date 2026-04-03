@@ -2,13 +2,40 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
+// --- Load environment variables from .env file ---
+// dotenv reads .env and sets process.env values.
+// In production, env vars are set by pm2's ecosystem.config.js instead.
+require('dotenv').config();
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// --- Request Logger ---
+// Logs every incoming request with method, URL, and timestamp.
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  next();
+});
+
+// --- Health Check Endpoint ---
+// A simple route that returns the app status, uptime, and version.
+// Used by monitoring tools, load balancers, and Nginx to check if the app is alive.
+// NO authentication required — health checks must be fast and public.
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // --- Basic Authentication Middleware ---
-const AUTH_USER = 'admin';
-const AUTH_PASS = 'password123';
+// Credentials come from environment variables — NEVER hardcoded.
+// Fallbacks are only for local development convenience.
+const AUTH_USER = process.env.AUTH_USER || 'admin';
+const AUTH_PASS = process.env.AUTH_PASS || 'changeme';
 
 function basicAuth(req, res, next) {
   const authHeader = req.headers.authorization;

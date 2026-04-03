@@ -1,7 +1,10 @@
 const request = require('supertest');
 const app = require('../src/app');
 
-const AUTH = 'Basic ' + Buffer.from('admin:password123').toString('base64');
+// Use env vars for test credentials (same ones set in .env)
+const testUser = process.env.AUTH_USER || 'admin';
+const testPass = process.env.AUTH_PASS || 'changeme';
+const AUTH = 'Basic ' + Buffer.from(`${testUser}:${testPass}`).toString('base64');
 const BAD_AUTH = 'Basic ' + Buffer.from('wrong:wrong').toString('base64');
 
 beforeEach(() => {
@@ -108,5 +111,15 @@ describe('DELETE /api/items/:id', () => {
       .delete('/api/items/999')
       .set('Authorization', AUTH);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /health', () => {
+  test('returns health status without auth', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body).toHaveProperty('uptime');
+    expect(res.body).toHaveProperty('timestamp');
   });
 });

@@ -66,10 +66,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Run the test suite — if ANY test fails, the job fails
-      # and the deploy job below will NOT execute
-      - name: Run tests
-        run: npm test
+      # Run the test suite with coverage — if ANY test fails, the job fails
+      # and the deploy job below will NOT execute.
+      # Coverage report is uploaded as an artifact for review.
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      # Upload single-file HTML coverage report as downloadable artifact.
+      # Available at: Actions → workflow run → Artifacts → "coverage-report-master"
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-master
+          path: coverage/coverage-report.html
+          retention-days: 30
 
   # ---------------------------------------------------------------------------
   # JOB 2: DEPLOY — Push stable code to /var/www/pipelinemaster
@@ -107,6 +118,8 @@ jobs:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}    # Server IP address
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}    # SSH username (root)
           TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}  # SSH private key
+          AUTH_USER: ${{ secrets.AUTH_USER }}                  # App auth username
+          AUTH_PASS: ${{ secrets.AUTH_PASS }}                  # App auth password
         run: |
           echo "Deploying master to /var/www/pipelinemaster..."
 
@@ -146,7 +159,7 @@ jobs:
           #   --delete = remove files on server that no longer exist in the repo
           #              (keeps the server clean, prevents old files from lingering)
           #   -e = use this SSH command (with our deploy key) for the connection
-          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --delete \
+          rsync -avz --exclude='node_modules' --exclude='.git' --exclude='tests' --exclude='docs' --exclude='scripts' --exclude='coverage' --exclude='.env' --exclude='.env.example' --exclude='.github' --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             ./ ${TEST_SERVER_USER}@${TEST_SERVER_HOST}:/var/www/pipelinemaster/
 
@@ -160,7 +173,9 @@ jobs:
           #      This is the RELIABLE way to pass env vars to pm2.
           #   5. pm2 start ecosystem.config.js → start using the config file
           #   6. pm2 save → persist the process list so pm2 remembers after reboot
+          # ecosystem.config.js now includes AUTH_USER and AUTH_PASS from GitHub Secrets
+          # These env vars are passed through pm2 to the Node.js process
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipelinemaster\",script:\"src/server.js\",env:{PORT:5001}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipelinemaster\",script:\"src/server.js\",env:{PORT:5001,AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
 
           echo "✅ Master deployed to /var/www/pipelinemaster (port 5001)"
