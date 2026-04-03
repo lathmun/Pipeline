@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "jest --verbose --forceExit",
-    "bump": "node scripts/bump-version.js --help",
+    "test:coverage": "jest --verbose --forceExit --coverage && node scripts/coverage-report.js",
+    "bump": "node scripts/bump-version.js",
     "bump:patch": "node scripts/bump-version.js patch",
     "bump:minor": "node scripts/bump-version.js minor",
     "bump:major": "node scripts/bump-version.js major"
@@ -15,7 +16,19 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "json"
+    ]
+  },
   "dependencies": {
+    "dotenv": "^17.4.0",
     "express": "^5.2.1"
   },
   "devDependencies": {

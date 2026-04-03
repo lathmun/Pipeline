@@ -1,15 +1,20 @@
 const app = require('./app');
 const path = require('path');
+const log = require('./logger');
 
 const PORT = process.env.PORT || 5000;
 
 // Log startup info for debugging deployment issues
-console.log(`[startup] __dirname: ${__dirname}`);
-console.log(`[startup] cwd: ${process.cwd()}`);
-console.log(`[startup] public path: ${path.join(__dirname, '..', 'public')}`);
-console.log(`[startup] PORT env: ${process.env.PORT}`);
-console.log(`[startup] Using port: ${PORT}`);
+log.debug('Starting server', {
+  dirname: __dirname,
+  cwd: process.cwd(),
+  publicPath: path.join(__dirname, '..', 'public'),
+  portEnv: process.env.PORT,
+  port: PORT,
+  authUser: process.env.AUTH_USER ? 'set' : 'NOT SET (using fallback)',
+  authPass: process.env.AUTH_PASS ? 'set' : 'NOT SET (using fallback)',
+});
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  log.info(`Server running on http://localhost:${PORT}`);
 });

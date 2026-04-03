@@ -71,15 +71,27 @@ jobs:
       - name: Install dependencies
         run: npm ci  # Faster and more reliable than "npm install" in CI
 
-      # Run the full test suite.
+      # Run the full test suite WITH COVERAGE REPORT.
       # If ANY test fails:
       #   - This step exits with a non-zero code
       #   - The job is marked as failed
       #   - GitHub shows a red X ❌ on the PR page
       #   - With branch protection enabled, the "Merge" button stays DISABLED
-      #   - No one can merge broken code into master
       # If ALL tests pass:
       #   - GitHub shows a green checkmark ✅ on the PR page
       #   - The "Merge" button becomes clickable
-      - name: Run tests
-        run: npm test
+      # Coverage report shows which lines were tested and which were missed.
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      # Upload single-file coverage HTML as artifact.
+      # Download from: Actions → workflow run → Artifacts → "coverage-report-pr"
+      # "if: always()" means upload even if tests failed — so you can still
+      # see which lines are covered and debug failures.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-pr
+          path: coverage/coverage-report.html
+          retention-days: 30
