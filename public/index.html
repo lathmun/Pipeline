@@ -30,6 +30,8 @@
     #message { padding: 10px; margin-bottom: 15px; border-radius: 4px; display: none; }
     #message.success { display: block; background: #d4edda; color: #155724; }
     #message.error { display: block; background: #f8d7da; color: #721c24; }
+    #login-message { padding: 10px; margin-top: 12px; border-radius: 4px; display: none; }
+    #login-message.error { display: block; background: #f8d7da; color: #721c24; }
     #app-section { display: none; }
     #add-form { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
     #add-form input { flex: 1; min-width: 150px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; }
@@ -50,6 +52,7 @@
       <input type="password" id="password" placeholder="Enter password">
     </div>
     <button id="login-btn">Login</button>
+    <div id="login-message"></div>
   </div>
 
   <!-- App Section -->
@@ -79,11 +82,28 @@
     const loginSection = document.getElementById('login-section');
     const appSection = document.getElementById('app-section');
     const msgEl = document.getElementById('message');
+    const loginMsgEl = document.getElementById('login-message');
 
     function showMsg(text, type) {
       msgEl.textContent = text;
       msgEl.className = type;
       setTimeout(() => { msgEl.className = ''; msgEl.style.display = 'none'; }, 3000);
+    }
+
+    function showLoginMsg(text) {
+      loginMsgEl.textContent = text;
+      loginMsgEl.className = 'error';
+      setTimeout(() => { loginMsgEl.className = ''; loginMsgEl.style.display = 'none'; }, 4000);
+    }
+
+    // Helper: read the human-readable message from an API error response
+    async function getErrorMessage(res, fallback) {
+      try {
+        const body = await res.json();
+        return body.message || fallback;
+      } catch {
+        return fallback;
+      }
     }
 
     function authHeaders() {
@@ -94,19 +114,22 @@
     document.getElementById('login-btn').addEventListener('click', async () => {
       const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value.trim();
-      if (!user || !pass) return showMsg('Please enter credentials', 'error');
+      if (!user || !pass) return showLoginMsg('Please enter both username and password.');
 
       authHeader = 'Basic ' + btoa(user + ':' + pass);
 
       try {
         const res = await fetch('/api/items', { headers: authHeaders() });
-        if (!res.ok) throw new Error('Invalid credentials');
+        if (!res.ok) {
+          const msg = await getErrorMessage(res, 'Login failed. Please check your credentials.');
+          throw new Error(msg);
+        }
         loginSection.style.display = 'none';
         appSection.style.display = 'block';
         loadItems();
       } catch (e) {
         authHeader = '';
-        showMsg(e.message, 'error');
+        showLoginMsg(e.message);
       }
     });
 
@@ -123,6 +146,11 @@
     async function loadItems() {
       try {
         const res = await fetch('/api/items', { headers: authHeaders() });
+        if (res.status === 401) {
+          showMsg('Session expired. Please log in again.', 'error');
+          document.getElementById('logout-btn').click();
+          return;
+        }
         const items = await res.json();
         const tbody = document.getElementById('items-tbody');
         tbody.innerHTML = '';
@@ -160,7 +188,10 @@
           method: 'POST', headers: authHeaders(),
           body: JSON.stringify({ name, description })
         });
-        if (!res.ok) throw new Error('Failed to add item');
+        if (!res.ok) {
+          const msg = await getErrorMessage(res, 'Failed to add item.');
+          throw new Error(msg);
+        }
         document.getElementById('item-name').value = '';
         document.getElementById('item-desc').value = '';
         showMsg('Item added', 'success');
@@ -179,7 +210,10 @@
           method: 'PUT', headers: authHeaders(),
           body: JSON.stringify({ name, description })
         });
-        if (!res.ok) throw new Error('Failed to update item');
+        if (!res.ok) {
+          const msg = await getErrorMessage(res, 'Failed to update item.');
+          throw new Error(msg);
+        }
         showMsg('Item updated', 'success');
         loadItems();
       } catch (e) { showMsg(e.message, 'error'); }
@@ -192,7 +226,10 @@
         const res = await fetch(`/api/items/${id}`, {
           method: 'DELETE', headers: authHeaders()
         });
-        if (!res.ok) throw new Error('Failed to delete item');
+        if (!res.ok) {
+          const msg = await getErrorMessage(res, 'Failed to delete item.');
+          throw new Error(msg);
+        }
         showMsg('Item deleted', 'success');
         loadItems();
       } catch (e) { showMsg(e.message, 'error'); }
