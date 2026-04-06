@@ -168,6 +168,9 @@ jobs:
           TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
           AUTH_USER: ${{ secrets.AUTH_USER }}
           AUTH_PASS: ${{ secrets.AUTH_PASS }}
+          LOKI_URL: ${{ secrets.LOKI_URL }}
+          LOKI_USER: ${{ secrets.LOKI_USER }}
+          LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
         run: |
           echo "Deploying to test server..."
 
@@ -210,6 +213,6 @@ jobs:
           #   delete+start ensures a clean slate with correct settings every deploy.
           # Write ecosystem.config.js with PORT + AUTH credentials from GitHub Secrets
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipeline && npm ci --omit=dev && (pm2 delete pipeline 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipeline\",script:\"src/server.js\",env:{PORT:5000,AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
+            "cd /var/www/pipeline && npm ci --omit=dev && (pm2 delete pipeline 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipeline\",script:\"src/server.js\",env:{PORT:5000,AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\",LOG_TRANSPORT:\"direct\",LOKI_URL:\"${LOKI_URL}\",LOKI_USER:\"${LOKI_USER}\",LOKI_TOKEN:\"${LOKI_TOKEN}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
 
           echo "✅ Deployment to test server complete"

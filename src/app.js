@@ -54,6 +54,7 @@ function basicAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Basic ')) {
     log.warn('Auth failed: no credentials provided', { url: req.url });
+    res.set('WWW-Authenticate', 'Basic realm="Pipeline Admin"');
     return res.status(401).json({ error: 'AUTH_MISSING', message: 'Authentication required. Please provide your username and password.' });
   }
 
@@ -66,6 +67,7 @@ function basicAuth(req, res, next) {
   }
 
   log.warn('Auth failed: invalid credentials', { url: req.url });
+  res.set('WWW-Authenticate', 'Basic realm="Pipeline Admin"');
   return res.status(401).json({ error: 'AUTH_INVALID', message: 'Incorrect username or password. Please try again.' });
 }
 
