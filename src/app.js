@@ -1,13 +1,15 @@
 const express = require('express');
 const path = require('path');
-const log = require('./logger');
-const metrics = require('./metrics');
-const app = express();
 
 // --- Load environment variables from .env file ---
 // dotenv reads .env and sets process.env values.
 // In production, env vars are set by pm2's ecosystem.config.js instead.
+// MUST run before requiring logger so Loki credentials are available.
 require('dotenv').config();
+
+const log = require('./logger');
+const metrics = require('./metrics');
+const app = express();
 
 // Middleware
 app.use(express.json());

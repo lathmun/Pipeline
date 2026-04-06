@@ -2,7 +2,7 @@ const app = require('./app');
 const path = require('path');
 const log = require('./logger');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 // Log startup info for debugging deployment issues
 log.debug('Starting server', {
