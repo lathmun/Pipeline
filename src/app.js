@@ -32,8 +32,11 @@ app.use((req, res, next) => {
 
 // --- Request Logger ---
 // Logs every incoming request with method, URL, and timestamp.
+// Skips admin polling routes to prevent feedback loop (admin dashboard auto-refreshes every 5s).
 app.use((req, res, next) => {
-  log.info(`${req.method} ${req.url}`);
+  if (!req.url.startsWith('/api/admin/')) {
+    log.info(`${req.method} ${req.url}`);
+  }
   next();
 });
 
