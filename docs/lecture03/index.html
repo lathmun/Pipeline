@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 03 — Grafana Cloud, Loki &amp; Log Shipping</title>
+<!-- Author: GitHub Copilot -->
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.7; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 6px; transition: background .2s; }
+  nav a:hover { background: rgba(88,166,255,.15); }
+  nav .title { font-weight: 700; color: var(--text); font-size: 16px; margin-right: auto; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* SECTIONS */
+  section { margin-bottom: 64px; }
+  h1 { font-size: 2.4em; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.8em; color: var(--accent); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.3em; color: var(--purple); margin: 24px 0 12px; }
+  p, li { color: var(--text); margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 1.1em; margin-bottom: 32px; }
+
+  /* CONCEPT CARDS */
+  .concepts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 16px; }
+  .concept-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: transform .2s, box-shadow .2s; }
+  .concept-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .concept-card .icon { font-size: 2em; margin-bottom: 12px; }
+  .concept-card h4 { color: var(--accent); margin-bottom: 8px; font-size: 1.1em; }
+  .concept-card p { color: var(--muted); font-size: .95em; line-height: 1.6; }
+
+  /* CODE BLOCKS */
+  .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; overflow-x: auto; font-family: 'Fira Code', 'Consolas', monospace; font-size: 14px; line-height: 1.8; position: relative; }
+  .code-block .line { display: block; }
+  .code-block .line:hover { background: rgba(88,166,255,.06); }
+  .code-block .comment { color: var(--muted); font-style: italic; }
+  .code-block .keyword { color: var(--pink); }
+  .code-block .string { color: var(--green); }
+  .code-block .key { color: var(--purple); }
+  .code-block .label { position: absolute; top: 8px; right: 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* PIPELINE VISUALIZATION */
+  .pipeline-viz { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin: 20px 0; overflow-x: auto; }
+  .pipeline-flow { display: flex; align-items: center; gap: 0; justify-content: center; flex-wrap: wrap; min-height: 120px; }
+  .pipeline-step { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 130px; transition: all .4s ease; position: relative; }
+  .pipeline-step .step-icon { font-size: 1.8em; margin-bottom: 6px; }
+  .pipeline-step .step-name { font-weight: 600; font-size: .9em; }
+  .pipeline-step .step-detail { color: var(--muted); font-size: .75em; margin-top: 4px; }
+  .pipeline-arrow { font-size: 1.5em; color: var(--muted); padding: 0 8px; flex-shrink: 0; }
+  .pipeline-step.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(88,166,255,.3); }
+  .pipeline-step.done { border-color: var(--green); }
+  .pipeline-step.done .step-icon::after { content: ' ✅'; font-size: .6em; }
+  .pipeline-step.paused { border-color: var(--orange); box-shadow: 0 0 20px rgba(210,153,34,.3); }
+
+  .anim-controls { display: flex; gap: 12px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+  .anim-btn { background: var(--accent); color: #fff; border: none; padding: 8px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background .2s; }
+  .anim-btn:hover { background: #79c0ff; }
+  .anim-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .anim-btn.secondary:hover { border-color: var(--accent); }
+  .anim-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .pipeline-status { text-align: center; margin-top: 12px; font-size: .95em; min-height: 48px; color: var(--muted); line-height: 1.6; }
+
+  /* LINE-BY-LINE EXPLAINER */
+  .explainer { margin: 20px 0; }
+  .explainer-line { display: flex; gap: 16px; padding: 8px 12px; border-radius: 8px; margin: 2px 0; transition: background .2s; cursor: pointer; align-items: flex-start; }
+  .explainer-line:hover { background: rgba(88,166,255,.08); }
+  .explainer-line.highlight { background: rgba(88,166,255,.12); border-left: 3px solid var(--accent); }
+  .explainer-code { font-family: 'Fira Code', 'Consolas', monospace; font-size: 13px; white-space: pre; flex-shrink: 0; min-width: 420px; color: var(--text); }
+  .explainer-desc { color: var(--muted); font-size: 13px; line-height: 1.6; border-left: 2px solid var(--border); padding-left: 12px; }
+  .explainer-line .line-num { color: var(--muted); font-size: 12px; font-family: monospace; min-width: 28px; text-align: right; flex-shrink: 0; user-select: none; }
+
+  /* FLASH CARDS */
+  .flashcard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .flashcard { perspective: 1000px; height: 220px; cursor: pointer; }
+  .flashcard-inner { position: relative; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+  .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+  .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .flashcard-front { background: linear-gradient(135deg, #1a1f36, #161b22); border: 2px solid var(--accent); }
+  .flashcard-front .q-label { color: var(--accent); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-front p { font-size: 1.1em; font-weight: 500; }
+  .flashcard-back { background: linear-gradient(135deg, #0f2d1a, #161b22); border: 2px solid var(--green); transform: rotateY(180deg); }
+  .flashcard-back .a-label { color: var(--green); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-back p { font-size: .95em; color: var(--text); line-height: 1.6; }
+  .flashcard-hint { color: var(--muted); font-size: .75em; margin-top: 12px; }
+
+  /* FAQ */
+  .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin: 12px 0; overflow: hidden; }
+  .faq-q { padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; transition: background .2s; }
+  .faq-q:hover { background: rgba(88,166,255,.06); }
+  .faq-q .arrow { transition: transform .3s; color: var(--muted); }
+  .faq-q.open .arrow { transform: rotate(180deg); }
+  .faq-a { padding: 0 20px; max-height: 0; overflow: hidden; transition: max-height .4s ease, padding .4s ease; color: var(--muted); line-height: 1.8; }
+  .faq-a.open { max-height: 600px; padding: 0 20px 20px; }
+  .faq-a code { background: var(--bg); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: .9em; color: var(--accent); }
+  .faq-tag { display: inline-block; background: rgba(88,166,255,.15); color: var(--accent); font-size: .7em; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: 400; }
+
+  /* COMPARISON TABLE */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { padding: 12px 16px; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+  td { background: var(--bg); }
+  tr:hover td { background: rgba(88,166,255,.04); }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: .75em; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+  .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-orange { background: rgba(210,153,34,.15); color: var(--orange); }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .explainer-line { flex-direction: column; gap: 4px; }
+    .explainer-code { min-width: unset; font-size: 12px; }
+    .pipeline-flow { flex-direction: column; }
+    .pipeline-arrow { transform: rotate(90deg); }
+    nav { padding: 8px 12px; }
+    h1 { font-size: 1.8em; }
+  }
+
+  /* SCROLL ANIMATION */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s, transform .6s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* TABLE BLOCK (wrapper for ? button) */
+  .table-block { position:relative; margin:16px 0; }
+
+  /* QUESTION SYSTEM */
+  .q-ask-btn { position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--orange); background:var(--surface); color:var(--orange); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:10; transition:all .2s; opacity:.7; line-height:1; padding:0; font-family:inherit; }
+  .q-ask-btn:hover { opacity:1; border-color:var(--orange); background:rgba(210,153,34,.2); transform:scale(1.15); }
+  .q-ask-btn.has-questions { opacity:1; background:rgba(210,153,34,.18); border-color:var(--orange); }
+  .q-input-box { background:var(--bg); border:1px solid var(--orange); border-radius:8px; padding:12px; margin-top:12px; position:relative; z-index:20; }
+  .q-input-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:inherit; font-size:14px; resize:vertical; min-height:60px; }
+  .q-input-box textarea:focus { outline:none; border-color:var(--orange); }
+  .q-input-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .q-input-actions button { padding:5px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; border:none; }
+  .q-input-actions .q-save-btn { background:var(--orange); color:#0d1117; }
+  .q-input-actions .q-save-btn:hover { background:#e5ac30; }
+  .q-input-actions .q-cancel-btn { background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .q-input-actions .q-cancel-btn:hover { border-color:var(--orange) !important; }
+  .q-saved-list { margin-top:8px; }
+  .q-saved-item { display:flex; gap:8px; align-items:flex-start; padding:5px 10px; background:rgba(210,153,34,.06); border-left:2px solid var(--orange); border-radius:0 6px 6px 0; margin:4px 0; font-size:.82em; }
+  .q-saved-item span:first-child { flex-shrink:0; }
+  .q-saved-text { color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📚 Lecture 03</span>
+  <a href="#concepts">Concepts</a>
+  <a href="#comparisons">Comparisons</a>
+  <a href="#flow-anim">Animated Flow</a>
+  <a href="#code-explained">Code Explained</a>
+  <a href="#flashcards">Flash Cards</a>
+  <a href="#faq">FAQ</a>
+  <a href="#debugging-stories">Debugging Stories</a>
+  <a href="quiz.html">📝 Take Quiz (60 Questions)</a>
+  <a href="../lecture02/index.html">← Lecture 02</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ HERO ═══════════ -->
+<section>
+  <h1>Grafana Cloud, Loki &amp; Log Shipping</h1>
+  <p class="subtitle">Ship structured logs from your Node.js app to Grafana Cloud Loki, query them with LogQL, and monitor everything through an admin dashboard — all without ELK or heavyweight agents.</p>
+</section>
+
+<!-- ═══════════ 1. CORE CONCEPTS ═══════════ -->
+<section id="concepts" class="reveal">
+  <h2>🧠 Core Concepts</h2>
+  <p>The building blocks of cloud-based log management and observability.</p>
+
+  <div class="concepts-grid">
+    <div class="concept-card">
+      <div class="icon">🔭</div>
+      <h4>Observability</h4>
+      <p>The ability to understand what your app is doing <strong>from the outside</strong> — by looking at its outputs (logs, metrics, traces). If something breaks at 3 AM, observability means you can figure out why without SSH-ing into the server.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📊</div>
+      <h4>Grafana Cloud</h4>
+      <p>A hosted observability platform. It provides <strong>Grafana</strong> (dashboards), <strong>Loki</strong> (logs), <strong>Prometheus</strong> (metrics), and <strong>Tempo</strong> (traces) — all managed for you. Free tier is generous enough for small projects.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📋</div>
+      <h4>Grafana Loki</h4>
+      <p>A log aggregation system that indexes only <strong>labels</strong>, not the full log text. Much cheaper and simpler than Elasticsearch. Query logs with <strong>LogQL</strong>. Think of it as "Prometheus, but for logs."</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🏷️</div>
+      <h4>Log Labels</h4>
+      <p>Key-value pairs attached to a log stream: <code>{app="pipeline", version="3.1.6"}</code>. Loki uses labels for fast lookup — like database indexes. Keep labels <strong>low-cardinality</strong> (few unique values) for performance.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🚛</div>
+      <h4>Log Transport Modes</h4>
+      <p>How logs get from your app to Loki. Our logger supports 3 modes: <strong>local</strong> (stdout only), <strong>direct</strong> (HTTP push to Loki), <strong>alloy</strong> (stdout for Grafana Alloy agent to tail). Switch at runtime via the admin dashboard.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📡</div>
+      <h4>Loki Push API</h4>
+      <p>A REST endpoint at <code>/loki/api/v1/push</code> that accepts JSON log entries. Our logger batches entries (10 max or every 2 seconds) and pushes them over HTTPS with Basic auth. Each push contains a <strong>stream</strong> (labels + values).</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🖥️</div>
+      <h4>Admin Dashboard</h4>
+      <p>A protected page at <code>/admin</code> showing request metrics, live log stream, and transport controls. Toggle between Local/Direct/Alloy, test the Loki connection, and reset metrics — all from the browser.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📝</div>
+      <h4>Structured Log Metadata</h4>
+      <p>Every log entry includes <code>app</code>, <code>version</code>, <code>level</code>, <code>timestamp</code>, and <code>message</code>. Actions are described in detail: <em>"New item added to the list — 'Widget' assigned id 4 (total items: 4)"</em>. Makes debugging in Grafana effortless.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 2. KEY COMPARISONS ═══════════ -->
+<section id="comparisons" class="reveal">
+  <h2>⚖️ Key Comparisons</h2>
+
+  <div class="table-block">
+  <h3>Log Transport Modes: Local vs Direct vs Alloy</h3>
+  <table>
+    <tr><th>Feature</th><th>Local</th><th>Direct</th><th>Alloy</th></tr>
+    <tr><td>Where logs go</td><td>stdout/stderr only</td><td>stdout + HTTP push to Loki</td><td>stdout (Alloy agent tails files)</td></tr>
+    <tr><td>Latency</td><td>Instant (local)</td><td>~2s (batched push)</td><td>Depends on agent config</td></tr>
+    <tr><td>Dependencies</td><td>None</td><td>LOKI_URL, LOKI_USER, LOKI_TOKEN</td><td>Alloy agent installed on server</td></tr>
+    <tr><td>Env var</td><td><code>LOG_TRANSPORT=local</code></td><td><code>LOG_TRANSPORT=direct</code></td><td><code>LOG_TRANSPORT=alloy</code></td></tr>
+    <tr><td>Best for</td><td>Local dev, testing</td><td>Small apps, quick setup ✅</td><td>Large-scale, multi-app servers</td></tr>
+    <tr><td>If Loki is down</td><td>N/A</td><td>Logs still go to stdout (silently drops push)</td><td>Agent buffers and retries</td></tr>
+  </table>
+  </div>
+
+  <div class="table-block">
+  <h3>console.log vs Loki-Connected Logger</h3>
+  <table>
+    <tr><th>Feature</th><th>console.log</th><th>Our Logger (Loki)</th></tr>
+    <tr><td>Output</td><td>Plain text to terminal</td><td>JSON to stdout + Grafana Cloud ✅</td></tr>
+    <tr><td>Searchable</td><td>grep on server only</td><td>LogQL queries from anywhere ✅</td></tr>
+    <tr><td>Retention</td><td>Lost when pm2 rotates logs</td><td>30 days in Grafana Cloud ✅</td></tr>
+    <tr><td>Dashboards</td><td>None</td><td>Build charts, alerts, filters in Grafana ✅</td></tr>
+    <tr><td>Labels</td><td>Not possible</td><td>app, version, environment ✅</td></tr>
+    <tr><td>Cost</td><td>Free (but useless at scale)</td><td>Free tier: 50GB logs/month</td></tr>
+  </table>
+  </div>
+
+  <div class="table-block">
+  <h3>Pull-Based vs Push-Based Logging</h3>
+  <table>
+    <tr><th>Feature</th><th>Pull-Based (Alloy/Promtail)</th><th>Push-Based (Direct HTTP)</th></tr>
+    <tr><td>Who initiates</td><td>Agent on server reads log files / stdout</td><td>App sends HTTP POST to Loki</td></tr>
+    <tr><td>Setup complexity</td><td>Install + configure agent on server</td><td>Just set 3 env vars ✅</td></tr>
+    <tr><td>Reliability</td><td>Agent handles retries, buffering ✅</td><td>App drops logs silently on failure</td></tr>
+    <tr><td>Performance</td><td>Async, no app overhead ✅</td><td>Small overhead per batch push</td></tr>
+    <tr><td>Our implementation</td><td><code>LOG_TRANSPORT=alloy</code></td><td><code>LOG_TRANSPORT=direct</code></td></tr>
+    <tr><td>Best for</td><td>Production at scale</td><td>Getting started quickly ✅</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════ 3. HOW IT WORKS — ANIMATED FLOW ═══════════ -->
+<section id="flow-anim" class="reveal">
+  <h2>🔄 How It Works — Animated Flow</h2>
+  <p>Watch how logs travel from your app to Grafana Cloud. Use <strong>Pause</strong> to stop at any step, then <strong>Resume</strong> to continue.</p>
+
+  <h3>Direct Push: App → Loki → Grafana</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="direct-flow">
+      <div class="pipeline-step" id="d-app">
+        <div class="step-icon">🖥️</div>
+        <div class="step-name">Node.js App</div>
+        <div class="step-detail">log.info("Item created")</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="d-buffer">
+        <div class="step-icon">📦</div>
+        <div class="step-name">Log Buffer</div>
+        <div class="step-detail">Batch: 10 entries or 2s</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="d-push">
+        <div class="step-icon">📡</div>
+        <div class="step-name">HTTP Push</div>
+        <div class="step-detail">POST /loki/api/v1/push</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="d-loki">
+        <div class="step-icon">📋</div>
+        <div class="step-name">Grafana Loki</div>
+        <div class="step-detail">Index labels, store log</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="d-grafana">
+        <div class="step-icon">📊</div>
+        <div class="step-name">Grafana UI</div>
+        <div class="step-detail">Query with LogQL</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="direct-status">Click "▶ Play" to watch the direct push flow step by step</div>
+    <div class="anim-controls">
+      <button class="anim-btn" id="direct-play-btn" onclick="directPlay()">▶ Play</button>
+      <button class="anim-btn secondary" id="direct-pause-btn" onclick="directPause()" disabled>⏸ Pause</button>
+      <button class="anim-btn secondary" id="direct-step-btn" onclick="directStep()">⏭ Step</button>
+      <button class="anim-btn secondary" onclick="directReset()">↺ Reset</button>
+    </div>
+  </div>
+
+  <h3>Alloy Transport: App → Agent → Loki</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="alloy-flow">
+      <div class="pipeline-step" id="a-app">
+        <div class="step-icon">🖥️</div>
+        <div class="step-name">Node.js App</div>
+        <div class="step-detail">stdout JSON logs</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="a-pm2">
+        <div class="step-icon">📄</div>
+        <div class="step-name">pm2 Log Files</div>
+        <div class="step-detail">~/.pm2/logs/*.log</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="a-alloy">
+        <div class="step-icon">🔗</div>
+        <div class="step-name">Grafana Alloy</div>
+        <div class="step-detail">Tails files, adds labels</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="a-loki">
+        <div class="step-icon">📋</div>
+        <div class="step-name">Grafana Loki</div>
+        <div class="step-detail">Stores &amp; indexes</div>
+      </div>
+    </div>
+    <div class="pipeline-status">Alloy runs as a daemon on the server — it continuously tails pm2 log files and ships entries to Loki with retries and buffering</div>
+  </div>
+
+  <h3>Loki Query Flow: Grafana → Labels → Results</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="query-flow">
+      <div class="pipeline-step" id="q-user">
+        <div class="step-icon">👤</div>
+        <div class="step-name">You (Grafana UI)</div>
+        <div class="step-detail">{app="pipeline"}</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="q-loki">
+        <div class="step-icon">📋</div>
+        <div class="step-name">Loki Engine</div>
+        <div class="step-detail">Filter by labels first</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="q-filter">
+        <div class="step-icon">🔍</div>
+        <div class="step-name">LogQL Filter</div>
+        <div class="step-detail">|= "error" or | json</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="q-results">
+        <div class="step-icon">📊</div>
+        <div class="step-name">Results</div>
+        <div class="step-detail">Logs, charts, alerts</div>
+      </div>
+    </div>
+    <div class="pipeline-status">Loki first narrows by labels (fast index lookup), then applies text/JSON filters on the matching streams only — this is why labels matter for performance</div>
+  </div>
+</section>
+
+<!-- ═══════════ 4. CODE EXPLAINED ═══════════ -->
+<section id="code-explained" class="reveal">
+  <h2>📖 Code Explained — Line by Line</h2>
+  <p>Click any line to highlight it. Every key piece of the Loki integration explained.</p>
+
+  <h3>logger.js — Transport Modes &amp; Loki Push</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">1</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> TRANSPORTS = [<span style="color:var(--green)">'local'</span>, <span style="color:var(--green)">'direct'</span>, <span style="color:var(--green)">'alloy'</span>];</span>
+      <span class="explainer-desc">The three supported transport modes. <code>local</code> = stdout only, <code>direct</code> = push to Loki, <code>alloy</code> = stdout for agent to tail.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">2</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> APP_NAME = process.env.<span style="color:var(--green)">APP_NAME</span> || require(<span style="color:var(--green)">'../package.json'</span>).name;</span>
+      <span class="explainer-desc">App name from env var or package.json. Used as a Loki label. We set <code>APP_NAME=pipelinemaster</code> on the master deployment so logs are separate.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">3</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> APP_VERSION = require(<span style="color:var(--green)">'../public/version.json'</span>).version;</span>
+      <span class="explainer-desc">Reads version from <code>version.json</code> (updated by <code>npm run bump</code>). Every log entry and Loki label includes this — filter logs by release version.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">4</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>.lokiUrl = process.env.<span style="color:var(--green)">LOKI_URL</span> || <span style="color:var(--green)">''</span>;</span>
+      <span class="explainer-desc">Grafana Cloud Loki push URL (e.g., <code>https://logs-prod-012.grafana.net</code>). Stored as a GitHub Secret, injected via ecosystem.config.js.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">5</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>.lokiUser = process.env.<span style="color:var(--green)">LOKI_USER</span> || <span style="color:var(--green)">''</span>;</span>
+      <span class="explainer-desc">Your Grafana Cloud user ID (a number). Used for HTTP Basic Authentication when pushing to Loki.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">6</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>.lokiToken = process.env.<span style="color:var(--green)">LOKI_TOKEN</span> || <span style="color:var(--green)">''</span>;</span>
+      <span class="explainer-desc">Grafana Cloud API token with <strong>write</strong> scope. A read-only token will return 403. Generate in Grafana Cloud → API Keys.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">7</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._lokiBuffer = []; <span style="color:var(--muted)">// batch: 10 max or every 2s</span></span>
+      <span class="explainer-desc">Logs are buffered in memory before pushing. Flushed when buffer hits 10 entries <strong>or</strong> every 2 seconds — whichever comes first. Reduces HTTP overhead.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">8</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>.transport === <span style="color:var(--green)">'direct'</span>) <span style="color:var(--pink)">this</span>._startFlushTimer();</span>
+      <span class="explainer-desc">Only start the 2-second flush timer if transport is "direct". For local/alloy, no timer is needed — logs just go to stdout.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">9</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._recentLogs = []; <span style="color:var(--muted)">// ring buffer, max 200</span></span>
+      <span class="explainer-desc">The last 200 log entries are kept in memory. The admin dashboard reads these via <code>GET /api/admin/logs</code> — no Loki needed for recent logs.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">10</span>
+      <span class="explainer-code">setTransport(mode) { <span style="color:var(--muted)">// switch at runtime</span></span>
+      <span class="explainer-desc">Change transport mode without restarting. The admin dashboard calls <code>PUT /api/admin/transport</code> which calls this method. Stops/starts the Loki flush timer as needed.</span>
+    </div>
+  </div>
+
+  <h3>logger.js — The Loki Push Method</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">11</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> ns = <span style="color:var(--pink)">new</span> Date(e.timestamp).getTime() + <span style="color:var(--green)">'000000'</span>;</span>
+      <span class="explainer-desc">Loki needs nanosecond timestamps. JavaScript gives milliseconds — we append 6 zeros to convert. Example: <code>1712345678123</code> → <code>1712345678123000000</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">12</span>
+      <span class="explainer-code"><span style="color:var(--purple)">stream</span>: { <span style="color:var(--purple)">app</span>: APP_NAME, <span style="color:var(--purple)">version</span>: APP_VERSION, <span style="color:var(--purple)">environment</span>: ... }</span>
+      <span class="explainer-desc"><strong>Labels</strong> attached to the log stream. Loki indexes these for fast queries. Filter with <code>{app="pipeline", version="3.1.6"}</code> in LogQL.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">13</span>
+      <span class="explainer-code"><span style="color:var(--purple)">values</span>: [[ns, JSON.stringify(e)]]</span>
+      <span class="explainer-desc">Each value is a [timestamp, log_line] pair. The log line is the full JSON entry as a string. Loki stores this as-is — parsed at query time with <code>| json</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">14</span>
+      <span class="explainer-code"><span style="color:var(--green)">'Authorization'</span>: <span style="color:var(--green)">'Basic '</span> + Buffer.from(user + <span style="color:var(--green)">':'</span> + token).toString(<span style="color:var(--green)">'base64'</span>)</span>
+      <span class="explainer-desc">HTTP Basic Auth — <code>LOKI_USER:LOKI_TOKEN</code> base64-encoded. Grafana Cloud requires this. The token must have <strong>write</strong> scope or you get 403.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">15</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> ok = res.statusCode >= <span style="color:var(--green)">200</span> && res.statusCode < <span style="color:var(--green)">300</span>;</span>
+      <span class="explainer-desc">Loki returns 204 (No Content) on success. Any 2xx is OK. A 403 means wrong token scope. A 429 means rate limited.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">16</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._pushToLoki(batch).<span style="color:var(--green)">catch</span>(() => {}); <span style="color:var(--muted)">// silently drop</span></span>
+      <span class="explainer-desc">If Loki push fails, we silently drop the batch. Logs are already on stdout (captured by pm2). The app never crashes because of a logging failure.</span>
+    </div>
+  </div>
+
+  <h3>app.js — Admin Routes &amp; Metrics</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">17</span>
+      <span class="explainer-code">app.use((req, res, next) => { <span style="color:var(--muted)">// metrics middleware</span></span>
+      <span class="explainer-desc">Runs on every request. Records start time, then on <code>res.finish</code> computes duration and feeds it to the metrics collector.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">18</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (duration > <span style="color:var(--green)">1000</span>) log.<span style="color:var(--orange)">warn</span>(<span style="color:var(--green)">'Slow response detected'</span>, { durationMs });</span>
+      <span class="explainer-desc">Logs a warning when any response takes more than 1 second. Helps catch performance issues in Grafana — filter with <code>|= "Slow response"</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">19</span>
+      <span class="explainer-code">res.set(<span style="color:var(--green)">'WWW-Authenticate'</span>, <span style="color:var(--green)">'Basic realm="Pipeline Admin"'</span>);</span>
+      <span class="explainer-desc">Tells the browser to show a login popup. Without this header, the browser gets a 401 but doesn't know to prompt for credentials — we learned this the hard way!</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">20</span>
+      <span class="explainer-code">app.put(<span style="color:var(--green)">'/api/admin/transport'</span>, basicAuth, (req, res) => { ... });</span>
+      <span class="explainer-desc">Switches log transport mode at runtime. The admin clicks a button, it sends a PUT, and the logger changes from local to direct (or vice versa) instantly.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">21</span>
+      <span class="explainer-code">app.post(<span style="color:var(--green)">'/api/admin/test-loki'</span>, basicAuth, <span style="color:var(--pink)">async</span> (req, res) => { ... });</span>
+      <span class="explainer-desc">Tests the Loki connection by pushing a single test entry. Returns <code>{ ok: true/false, status, message }</code>. Used by the admin dashboard's "Test Connection" button.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 5. FLASH CARDS ═══════════ -->
+<section id="flashcards" class="reveal">
+  <h2>🃏 Flash Cards — Click to Flip</h2>
+  <p>Test your memory! Click a card to reveal the answer.</p>
+
+  <div class="flashcard-container" id="flashcard-wrapper"></div>
+
+  <div class="anim-controls" style="margin-top:24px;">
+    <button class="anim-btn secondary" onclick="shuffleCards()">🔀 Shuffle Cards</button>
+  </div>
+</section>
+
+<!-- ═══════════ 6. FAQ ═══════════ -->
+<section id="faq" class="reveal">
+  <h2>❓ FAQ — Real Questions &amp; Answers</h2>
+  <p>Common questions about Grafana, Loki, transport modes, and log shipping.</p>
+  <div id="faq-container"></div>
+</section>
+
+<!-- ═══════════ 7. DEBUGGING STORIES ═══════════ -->
+<section id="debugging-stories" class="reveal">
+  <h2>🔧 Real Debugging Stories — From Our Build</h2>
+  <p>Every issue we actually hit while building this lecture's features, and how we fixed them. These are real problems — not textbook examples.</p>
+  <div id="debug-faq-container"></div>
+</section>
+
+<!-- ═══════════ CHEAT SHEET ═══════════ -->
+<section class="reveal">
+  <h2>📋 Quick Reference Cheat Sheet</h2>
+  <div class="concepts-grid">
+    <div class="concept-card">
+      <h4>LogQL Queries</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line"><span class="comment"># All logs from pipeline (test branch)</span></span>
+<span class="line">{app="pipeline"}</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Master branch logs only</span></span>
+<span class="line">{app="pipelinemaster"}</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Filter by level</span></span>
+<span class="line">{app="pipeline"} |= "error"</span>
+<span class="line">{app="pipeline"} | json | level="warn"</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Filter by version</span></span>
+<span class="line">{app="pipeline", version="3.1.6"}</span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>Transport Modes</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line"><span class="comment"># Set in .env (local dev)</span></span>
+<span class="line">LOG_TRANSPORT=local</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Production (ecosystem.config.js)</span></span>
+<span class="line">LOG_TRANSPORT=direct</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Runtime switch via API</span></span>
+<span class="line">PUT /api/admin/transport</span>
+<span class="line">{ "transport": "direct" }</span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>Loki Env Vars</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line"><span class="comment"># Required for direct transport</span></span>
+<span class="line">LOKI_URL=https://logs-prod-012.grafana.net</span>
+<span class="line">LOKI_USER=1540346</span>
+<span class="line">LOKI_TOKEN=glc_eyJv...</span>
+<span class="line"></span>
+<span class="line"><span class="comment"># Optional</span></span>
+<span class="line">APP_NAME=pipelinemaster</span>
+<span class="line">LOG_LEVEL=info</span>
+      </div>
+    </div>
+    <div class="concept-card">
+      <h4>Admin Endpoints</h4>
+      <div class="code-block" style="font-size:13px;">
+<span class="line">GET  /admin           <span class="comment"># Dashboard HTML</span></span>
+<span class="line">GET  /api/admin/stats <span class="comment"># Metrics JSON</span></span>
+<span class="line">GET  /api/admin/logs  <span class="comment"># Recent logs</span></span>
+<span class="line">GET  /api/admin/transport</span>
+<span class="line">PUT  /api/admin/transport</span>
+<span class="line">POST /api/admin/test-loki</span>
+<span class="line">POST /api/admin/reset-metrics</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ NAV TO QUIZ ═══════════ -->
+<section class="reveal" style="text-align:center; padding:48px 0;">
+  <h2>Ready to test your knowledge?</h2>
+  <p style="margin:16px 0 24px; color:var(--muted);">60 multiple choice questions covering Grafana, Loki, transport modes, LogQL, admin dashboard, and security.</p>
+  <a href="quiz.html" class="anim-btn" style="display:inline-block; text-decoration:none; font-size:1.2em; padding:14px 40px;">📝 Take the Quiz →</a>
+</section>
+
+</div>
+
+<script>
+// ═══════════ DIRECT PUSH FLOW ANIMATION ═══════════
+const directSteps = ['d-app','d-buffer','d-push','d-loki','d-grafana'];
+const directMessages = [
+  'Your app calls log.info("Item created", { id: 4 }).\nThe _log() method builds a JSON entry with timestamp, app, version, level, and message.\nThe entry is written to stdout AND added to the Loki buffer.',
+  'The buffer collects log entries in memory.\nWhen 10 entries accumulate OR 2 seconds pass (whichever comes first), the buffer is flushed.\nThis batching reduces the number of HTTP requests — instead of 1 request per log, you send 1 per batch.',
+  'The logger sends an HTTP POST to /loki/api/v1/push.\nThe payload contains a "stream" with labels {app, version, environment} and an array of [nanosecond_timestamp, json_line] pairs.\nAuthentication is via Basic Auth: LOKI_USER:LOKI_TOKEN base64-encoded.',
+  'Loki receives the push and indexes the labels.\nIt does NOT index the full log text (unlike Elasticsearch) — only the label key-value pairs.\nThis is why Loki is much cheaper and simpler. The actual log content is stored in compressed chunks.',
+  '✅ You open Grafana → Explore → select Loki data source.\nQuery: {app="pipeline"} to see all logs.\nAdd | json | level="error" to filter.\nBuild dashboards, set alerts, share with your team — all from the browser.'
+];
+let directAnimIdx = 0, directAnimTimer = null, directPaused = false;
+
+function directPlay() {
+  if (directPaused) { directResume(); return; }
+  directReset();
+  directPaused = false;
+  document.getElementById('direct-play-btn').textContent = '▶ Play';
+  document.getElementById('direct-pause-btn').disabled = false;
+  directAdvance();
+}
+function directAdvance() {
+  if (directAnimIdx >= directSteps.length) { document.getElementById('direct-pause-btn').disabled = true; return; }
+  const el = document.getElementById(directSteps[directAnimIdx]);
+  el.classList.add('active');
+  document.getElementById('direct-status').textContent = directMessages[directAnimIdx];
+  directAnimTimer = setTimeout(() => {
+    el.classList.remove('active'); el.classList.add('done'); directAnimIdx++;
+    if (directAnimIdx < directSteps.length && !directPaused) directAnimTimer = setTimeout(directAdvance, 400);
+    else if (directAnimIdx >= directSteps.length) {
+      document.getElementById('direct-status').innerHTML = '<span style="color:var(--green)">✅ Complete — logs are now in Grafana Cloud, queryable from anywhere.</span>';
+      document.getElementById('direct-pause-btn').disabled = true;
+    }
+  }, 2500);
+}
+function directPause() {
+  directPaused = true; clearTimeout(directAnimTimer);
+  document.getElementById('direct-play-btn').textContent = '▶ Resume';
+  document.getElementById('direct-pause-btn').disabled = true;
+  const c = document.getElementById(directSteps[directAnimIdx]);
+  if (c) { c.classList.remove('active'); c.classList.add('paused'); }
+}
+function directResume() {
+  directPaused = false;
+  document.getElementById('direct-play-btn').textContent = '▶ Play';
+  document.getElementById('direct-pause-btn').disabled = false;
+  const c = document.getElementById(directSteps[directAnimIdx]);
+  if (c) { c.classList.remove('paused'); c.classList.add('active'); }
+  directAnimTimer = setTimeout(() => {
+    const el = document.getElementById(directSteps[directAnimIdx]);
+    if (el) { el.classList.remove('active'); el.classList.add('done'); }
+    directAnimIdx++;
+    if (directAnimIdx < directSteps.length) directAnimTimer = setTimeout(directAdvance, 400);
+    else {
+      document.getElementById('direct-status').innerHTML = '<span style="color:var(--green)">✅ Complete — logs are now in Grafana Cloud.</span>';
+      document.getElementById('direct-pause-btn').disabled = true;
+    }
+  }, 1500);
+}
+function directStep() {
+  clearTimeout(directAnimTimer); directPaused = true;
+  document.getElementById('direct-play-btn').textContent = '▶ Resume';
+  document.getElementById('direct-pause-btn').disabled = true;
+  if (directAnimIdx > 0) { const prev = document.getElementById(directSteps[directAnimIdx-1]); if (prev) { prev.classList.remove('active','paused'); prev.classList.add('done'); } }
+  if (directAnimIdx >= directSteps.length) { document.getElementById('direct-status').innerHTML = '<span style="color:var(--green)">✅ Complete.</span>'; return; }
+  directSteps.forEach(id => { document.getElementById(id).classList.remove('active','paused'); });
+  const el = document.getElementById(directSteps[directAnimIdx]);
+  el.classList.add('paused');
+  document.getElementById('direct-status').textContent = directMessages[directAnimIdx];
+  directAnimIdx++;
+}
+function directReset() {
+  clearTimeout(directAnimTimer); directAnimIdx = 0; directPaused = false;
+  directSteps.forEach(id => { document.getElementById(id).classList.remove('active','done','paused'); });
+  document.getElementById('direct-status').textContent = 'Click "▶ Play" to watch the direct push flow step by step';
+  document.getElementById('direct-play-btn').textContent = '▶ Play';
+  document.getElementById('direct-pause-btn').disabled = false;
+}
+
+// ═══════════ LINE HIGHLIGHTER ═══════════
+function highlightLine(el) {
+  document.querySelectorAll('.explainer-line').forEach(l => l.classList.remove('highlight'));
+  el.classList.add('highlight');
+}
+
+// ═══════════ FLASH CARDS (37) ═══════════
+const flashcardData = [
+  // Grafana & Loki Basics
+  { q: 'What is Grafana Cloud?', a: 'A hosted observability platform providing Grafana (dashboards), Loki (logs), Prometheus (metrics), and Tempo (traces) — all managed. Free tier allows 50GB logs/month.' },
+  { q: 'What is Grafana Loki?', a: 'A log aggregation system that indexes only labels, not the full log text. Cheaper and simpler than Elasticsearch. Query logs with LogQL.' },
+  { q: 'How does Loki differ from Elasticsearch?', a: 'Loki only indexes labels (key-value pairs), not the full text. Elasticsearch indexes every word. Loki is cheaper, simpler, but full-text search is slower.' },
+  { q: 'What is LogQL?', a: 'Loki\'s query language. Start with label selectors like {app="pipeline"}, then add filters like |= "error" or | json | level="warn".' },
+  { q: 'What does "observability" mean?', a: 'The ability to understand your app\'s internal state from its external outputs — logs, metrics, and traces. You can debug production without SSH.' },
+  // Log Labels
+  { q: 'What are Loki labels?', a: 'Key-value pairs on a log stream: {app="pipeline", version="3.1.6"}. Loki indexes labels for fast lookup — like a database index.' },
+  { q: 'What labels does our app send?', a: 'Three labels: app (from APP_NAME), version (from version.json), and environment (from NODE_ENV). All set in the stream object sent to Loki.' },
+  { q: 'Why keep labels low-cardinality?', a: 'High-cardinality labels (like user_id with millions of values) create too many streams and overwhelm Loki. Use labels for broad categories, not unique values.' },
+  { q: 'How do you filter by label in Grafana?', a: 'Use LogQL label selectors: {app="pipeline"} or {app="pipeline", version="3.1.6"}. Labels are the first filter — fast index lookup before any text scanning.' },
+  // Transport Modes
+  { q: 'What are the 3 log transport modes?', a: 'local (stdout only), direct (HTTP push to Loki + stdout), alloy (stdout for Grafana Alloy agent to tail). Set via LOG_TRANSPORT env var or admin dashboard.' },
+  { q: 'When should you use "direct" transport?', a: 'For small apps that want quick Loki integration without installing an agent. Set LOKI_URL, LOKI_USER, LOKI_TOKEN and you\'re done.' },
+  { q: 'When should you use "alloy" transport?', a: 'For larger deployments where Grafana Alloy agent is installed on the server. The agent tails log files, adds labels, and ships to Loki with retry logic.' },
+  { q: 'Can you switch transport mode at runtime?', a: 'Yes! PUT /api/admin/transport with { "transport": "direct" }. The logger starts/stops the Loki flush timer instantly without restarting the server.' },
+  { q: 'What happens when Loki push fails?', a: 'The batch is silently dropped. Logs are already on stdout (captured by pm2). The app never crashes because of a logging failure.' },
+  // Loki Push API
+  { q: 'What is the Loki push endpoint?', a: 'POST /loki/api/v1/push. Accepts JSON with a "streams" array. Each stream has labels and an array of [nanosecond_timestamp, log_line] values.' },
+  { q: 'What authentication does Loki use?', a: 'HTTP Basic Auth — LOKI_USER:LOKI_TOKEN base64-encoded in the Authorization header. The token must have write scope.' },
+  { q: 'Why batch log entries before pushing?', a: 'Reduces HTTP overhead. Instead of 1 request per log entry, we batch 10 entries (or flush every 2 seconds) and send them in one POST.' },
+  { q: 'What timestamp format does Loki expect?', a: 'Nanosecond strings. JavaScript gives milliseconds — we append "000000" to convert. Example: 1712345678123 → "1712345678123000000".' },
+  { q: 'What HTTP status does Loki return on success?', a: '204 No Content. Any 2xx is success. 403 means wrong token scope (need write, not read). 429 means rate limited.' },
+  // Admin Dashboard
+  { q: 'What does the admin dashboard show?', a: 'Request metrics (total, by method/status, auth failures, avg response time, RPM), live log stream with level filter, transport controls, and Loki connection test.' },
+  { q: 'How does the admin dashboard auto-refresh?', a: 'JavaScript fetches /api/admin/stats and /api/admin/logs every 5 seconds and updates the DOM. No page reload needed.' },
+  { q: 'What does the "Test Connection" button do?', a: 'Sends a single test log entry to Loki via POST /api/admin/test-loki. Returns { ok: true/false, status, message } so you know if Loki credentials work.' },
+  // Metrics
+  { q: 'What metrics does our app track?', a: 'Total requests, by method (GET/POST/PUT/DELETE), by status (2xx/3xx/4xx/5xx), auth failures, response times (avg/min/max/p95), top routes, and rolling RPM.' },
+  { q: 'How is p95 response time calculated?', a: 'Sort all recorded durations, take the value at the 95th percentile. Meaning 95% of requests are faster than this value.' },
+  { q: 'Are metrics persistent?', a: 'No — they\'re in-memory and reset when the server restarts. The admin dashboard has a "Reset Metrics" button for manual reset.' },
+  // Security & Config
+  { q: 'Where are Loki credentials stored?', a: 'As GitHub Secrets (LOKI_URL, LOKI_USER, LOKI_TOKEN). The deploy workflow writes them into ecosystem.config.js for pm2 to read.' },
+  { q: 'Why does pm2 ignore .env files?', a: 'pm2 manages env vars through ecosystem.config.js or command-line flags. It doesn\'t load .env files. The deploy workflow handles this by writing the config.' },
+  { q: 'What is ecosystem.config.js?', a: 'A pm2 config file that defines app name, script path, and env vars. Our deploy workflow generates it from GitHub Secrets on every deploy.' },
+  { q: 'What happens if LOKI_TOKEN has read-only scope?', a: 'Push requests return 403 Forbidden. The admin "Test Connection" shows the error. You need a token with write scope from Grafana Cloud → API Keys.' },
+  // Version & App Name
+  { q: 'Where does APP_NAME come from?', a: 'process.env.APP_NAME (if set) or package.json name. We set APP_NAME=pipelinemaster in the master deploy so logs are separated from the test branch.' },
+  { q: 'Where does the version come from?', a: 'public/version.json — updated by npm run bump:patch/minor/major. Also syncs to package.json. Every log entry includes the version as a label and field.' },
+  { q: 'How do you filter logs by version in Grafana?', a: 'Use the version label: {app="pipeline", version="3.1.6"}. Useful for comparing log patterns before and after a release.' },
+  // Structured Logs
+  { q: 'What fields are in every log entry?', a: 'timestamp (ISO), app (name), version (from version.json), level (debug/info/warn/error), message, and optional meta object.' },
+  { q: 'What does log metadata include?', a: 'Extra context like { id: 4, name: "Widget" } for item creation, or { method: "GET", url: "/api/items", durationMs: 1200 } for slow responses.' },
+  { q: 'Why log action details in messages?', a: 'Messages like "New item added — Widget assigned id 4 (total: 4)" make Grafana browsing effortless. You understand what happened without reading code.' },
+  { q: 'What is the WWW-Authenticate header?', a: 'Tells the browser to show a login popup when it receives a 401. Without it, the browser just gets an error with no prompt. Format: Basic realm="Pipeline Admin".' },
+  { q: 'What is a ring buffer in our logger?', a: 'A fixed-size array (200 entries) that drops the oldest entry when full. Used for the "recent logs" feature in the admin dashboard — always shows the last 200.' },
+];
+
+function renderCards() {
+  const wrapper = document.getElementById('flashcard-wrapper');
+  wrapper.innerHTML = flashcardData.map((card, i) => `
+    <div class="flashcard" onclick="this.classList.toggle('flipped')">
+      <div class="flashcard-inner">
+        <div class="flashcard-front">
+          <div class="q-label">Question ${i + 1}</div>
+          <p>${card.q}</p>
+          <div class="flashcard-hint">Click to reveal answer</div>
+        </div>
+        <div class="flashcard-back">
+          <div class="a-label">Answer</div>
+          <p>${card.a}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function shuffleCards() {
+  for (let i = flashcardData.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [flashcardData[i], flashcardData[j]] = [flashcardData[j], flashcardData[i]];
+  }
+  renderCards();
+}
+
+renderCards();
+
+// ═══════════ FAQ DATA ═══════════
+const faqData = [
+  {
+    q: 'Why Loki instead of Elasticsearch / ELK stack?',
+    tag: 'Architecture',
+    a: 'Loki only indexes <strong>labels</strong>, not the full text of every log line. This makes it 10-100x cheaper to run. Elasticsearch indexes every word — powerful but expensive. For most apps, Loki\'s label-based filtering + LogQL is more than enough.'
+  },
+  {
+    q: 'What are Loki labels and why do they matter?',
+    tag: 'Labels',
+    a: 'Labels are key-value pairs on a log stream: <code>{app="pipeline", version="3.1.6"}</code>. Loki uses labels as its <strong>only index</strong>. When you query <code>{app="pipeline"}</code>, Loki first finds matching streams by label (fast), then scans only those streams for text matches. Bad labels = slow queries.'
+  },
+  {
+    q: 'How does batching work and why?',
+    tag: 'Performance',
+    a: 'The logger collects entries in a buffer. It flushes when the buffer hits 10 entries OR every 2 seconds (whichever first). Batching reduces HTTP overhead: instead of 100 requests/minute (one per log), you send ~10 requests/minute. The tradeoff is up to 2 seconds of latency before logs appear in Grafana.'
+  },
+  {
+    q: 'What happens if Loki is down or unreachable?',
+    tag: 'Reliability',
+    a: 'The push silently fails and the batch is dropped. But logs are <strong>always</strong> written to stdout first (captured by pm2). So you never lose logs — they\'re still on the server. This is a deliberate design: logging failures must never crash the app.'
+  },
+  {
+    q: 'Why three transport modes instead of just "direct"?',
+    tag: 'Architecture',
+    a: '<code>local</code> is for development (no Loki needed). <code>direct</code> is for quick deploys (just set env vars). <code>alloy</code> is for production at scale (agent handles retries, buffering, multiplexing). Different situations need different approaches.'
+  },
+  {
+    q: 'How do I see logs in Grafana after setting up direct push?',
+    tag: 'Usage',
+    a: 'Go to Grafana Cloud → Explore → select your Loki data source → type <code>{app="pipeline"}</code> → click Run. You should see logs appearing within 2-3 seconds of them being generated. Add <code>| json</code> to parse fields and filter by level, message, etc.'
+  },
+  {
+    q: 'What is the difference between stream labels and log fields?',
+    tag: 'Labels',
+    a: 'Stream labels (app, version, environment) are indexed by Loki and used for fast filtering. Log fields (level, message, meta) are inside the JSON log line and parsed at query time with <code>| json</code>. Labels = pre-indexed, fields = parsed on demand.'
+  },
+  {
+    q: 'Can I query logs from both test and master deployments?',
+    tag: 'Usage',
+    a: 'Yes! Test sends <code>app="pipeline"</code>, master sends <code>app="pipelinemaster"</code> (via APP_NAME env var). Query each separately or both: <code>{app=~"pipeline.*"}</code> uses regex matching.'
+  },
+  {
+    q: 'Why does the admin dashboard exist when we have Grafana?',
+    tag: 'Architecture',
+    a: 'The admin dashboard shows real-time request metrics and recent logs <strong>without needing Grafana access</strong>. It also lets you switch transport modes and test the Loki connection. Think of it as a lightweight ops panel built into the app.'
+  },
+  {
+    q: 'How are Loki credentials kept secure?',
+    tag: 'Security',
+    a: 'They\'re stored as GitHub Secrets (encrypted). The deploy workflow injects them into <code>ecosystem.config.js</code> on the server. They\'re never in the codebase, never in .env (which is rsync-excluded), and never logged (our logger doesn\'t output credential values).'
+  },
+  {
+    q: 'What is a nanosecond timestamp and why does Loki need it?',
+    tag: 'Technical',
+    a: 'Loki uses nanosecond-precision timestamps to order and deduplicate log entries. JavaScript\'s <code>Date.getTime()</code> gives milliseconds. We append "000000" to get nanoseconds: <code>1712345678123</code> → <code>"1712345678123000000"</code>.'
+  },
+  {
+    q: 'What metrics does the in-memory collector track?',
+    tag: 'Metrics',
+    a: 'Total requests, requests by HTTP method, by status category (2xx/3xx/4xx/5xx), auth failures, response times (average, min, max, p95), top 20 routes by hit count, and rolling requests per minute (5-minute window).'
+  },
+  {
+    q: 'How do I know if my Loki token has the right scope?',
+    tag: 'Security',
+    a: 'Use the admin dashboard\'s "Test Connection" button. If you get 403, the token is read-only. Go to Grafana Cloud → API Keys and generate a new token with <strong>write</strong> scope for Loki. The old read token still works for querying.'
+  },
+];
+
+function renderFAQ() {
+  const container = document.getElementById('faq-container');
+  container.innerHTML = faqData.map((item) => `
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        <span>${item.q} <span class="faq-tag">${item.tag}</span></span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="faq-a">${item.a}</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════ DEBUGGING STORIES FAQ ═══════════
+const debugFaqData = [
+  {
+    q: 'Port 5000 was already in use — the app couldn\'t start!',
+    tag: 'macOS',
+    a: '<strong>Symptom:</strong> <code>curl http://localhost:5000</code> returned <code>Server: AirTunes/935.7.1</code> instead of our API.<br><br><strong>Cause:</strong> macOS AirPlay Receiver occupies port 5000 by default. Our Express app tried to bind to 5000 but something else was already there.<br><br><strong>Fix:</strong> Changed the local dev port to <code>5050</code> in <code>.env</code> and the <code>server.js</code> fallback. Server deployments still use 5000 (test) and 5001 (master) since AirPlay isn\'t running on Linux servers.<br><br><strong>Lesson:</strong> Always check what\'s using your port with <code>lsof -i :5000</code> before blaming your code.'
+  },
+  {
+    q: 'Browser didn\'t show a login popup for /admin — just got a raw 401 error',
+    tag: 'HTTP Auth',
+    a: '<strong>Symptom:</strong> Visiting <code>/admin</code> returned a 401 JSON error with no browser login prompt.<br><br><strong>Cause:</strong> Our 401 response was missing the <code>WWW-Authenticate</code> header. Without this header, the browser doesn\'t know it should ask the user for credentials.<br><br><strong>Fix:</strong> Added <code>res.set(\'WWW-Authenticate\', \'Basic realm="Pipeline Admin"\')</code> to both 401 response paths in the basicAuth middleware.<br><br><strong>Lesson:</strong> HTTP Basic Auth is a two-part protocol: the server must tell the browser "I want credentials" via <code>WWW-Authenticate</code>, then the browser shows the popup.'
+  },
+  {
+    q: 'Loki credentials were always empty even though .env had them',
+    tag: 'Node.js',
+    a: '<strong>Symptom:</strong> <code>testLokiConnection()</code> always returned "not configured" even though LOKI_URL, LOKI_USER, LOKI_TOKEN were in <code>.env</code>.<br><br><strong>Cause:</strong> In <code>app.js</code>, the logger was imported <em>before</em> <code>require("dotenv").config()</code> ran. Since the logger is a singleton, it read process.env at import time — when the Loki vars were still undefined.<br><br><strong>Fix:</strong> Moved <code>require("dotenv").config()</code> to the very top of app.js, <em>before</em> any <code>require("./logger")</code> call.<br><br><strong>Lesson:</strong> Module load order matters! Singletons read config once at import time. If env vars aren\'t set yet, the singleton gets empty values forever.'
+  },
+  {
+    q: 'Loki push returned 403 Forbidden — "invalid scope requested"',
+    tag: 'Grafana Cloud',
+    a: '<strong>Symptom:</strong> The "Test Connection" button returned <code>403 — authentication error: invalid scope requested</code>.<br><br><strong>Cause:</strong> The Grafana Cloud API token was created with <code>hl-read-loki</code> scope (read-only). Pushing logs requires <strong>write</strong> scope.<br><br><strong>Fix:</strong> Generated a new token in Grafana Cloud → API Keys with write scope, updated the GitHub Secret <code>LOKI_TOKEN</code>.<br><br><strong>Lesson:</strong> Loki tokens have scopes. Read tokens can query logs but can\'t push. Write tokens can push but may not query (depends on config). Check your token scope when you get 403.'
+  },
+  {
+    q: 'Server .env file wasn\'t being read by the Node.js app',
+    tag: 'pm2',
+    a: '<strong>Symptom:</strong> Created a <code>.env</code> file directly on the server, but the running app still had old/empty env vars.<br><br><strong>Cause:</strong> pm2 does NOT read <code>.env</code> files. It uses <code>ecosystem.config.js</code> for environment variables. The <code>.env</code> + dotenv approach only works when you run the app directly with <code>node src/server.js</code>.<br><br><strong>Fix:</strong> Updated the deploy workflow to write all env vars (including Loki secrets) into <code>ecosystem.config.js</code>, which pm2 reads on start.<br><br><strong>Lesson:</strong> Know your process manager. pm2 has its own env var system. Your local dev flow (.env + dotenv) is completely separate from your production flow (ecosystem.config.js + pm2).'
+  },
+  {
+    q: 'Deploy workflow had Loki vars in ecosystem.config.js but they were empty',
+    tag: 'GitHub Actions',
+    a: '<strong>Symptom:</strong> The generated <code>ecosystem.config.js</code> on the server had <code>LOKI_URL:""</code> — empty strings.<br><br><strong>Cause:</strong> The deploy-master workflow used <code>${LOKI_URL}</code> in the SSH command, but the <code>env:</code> block didn\'t include <code>LOKI_URL: ${{ secrets.LOKI_URL }}</code>. The shell variable was undefined.<br><br><strong>Fix:</strong> Added LOKI_URL, LOKI_USER, LOKI_TOKEN to the deploy step\'s <code>env:</code> block so GitHub Actions injects the secrets as environment variables for the shell.<br><br><strong>Lesson:</strong> In GitHub Actions, <code>${{ secrets.X }}</code> must be mapped to an env var in the step\'s <code>env:</code> block before you can use <code>${X}</code> in shell commands.'
+  },
+  {
+    q: 'Admin login failed on the master deployment but worked on test',
+    tag: 'Deployment',
+    a: '<strong>Symptom:</strong> After merging to master and deploying, <code>/admin</code> returned 401 with the correct password.<br><br><strong>Cause:</strong> The master deploy workflow was missing the Loki vars in its <code>env:</code> block (they were in ecosystem.config.js template but referenced undefined variables). This was the same root cause as the "empty Loki vars" issue — the workflow wasn\'t consistent with the test branch workflow.<br><br><strong>Fix:</strong> Added all three Loki secrets to the master workflow\'s env block, matching the test branch workflow exactly.<br><br><strong>Lesson:</strong> Keep deploy workflows in sync. When you add secrets to one workflow, check the other. A CI/CD diff tool or shared workflow template helps prevent this.'
+  },
+  {
+    q: 'Both pipeline and pipelinemaster logged as app="pipeline"',
+    tag: 'Logging',
+    a: '<strong>Symptom:</strong> In Grafana, all logs from both the test and master deployments had <code>app="pipeline"</code>. Couldn\'t tell them apart.<br><br><strong>Cause:</strong> The app name was hardcoded from <code>package.json</code> name, which is "pipeline" for both deployments (same codebase).<br><br><strong>Fix:</strong> Changed logger to read <code>process.env.APP_NAME</code> first, falling back to package.json name. Then set <code>APP_NAME="pipelinemaster"</code> in the master ecosystem.config.js.<br><br><strong>Lesson:</strong> When running the same codebase in multiple environments, use env vars to differentiate. Hardcoded values from config files are shared across all deployments.'
+  },
+  {
+    q: 'Logger version was stuck at 1.0.0 even after bumping to 3.1.5',
+    tag: 'Versioning',
+    a: '<strong>Symptom:</strong> Log entries showed <code>"version":"1.0.0"</code> even though <code>npm run bump</code> reported <code>v3.1.5</code>.<br><br><strong>Cause:</strong> The bump script updated <code>public/version.json</code> but NOT <code>package.json</code>. The logger was reading version from <code>package.json</code> (still at 1.0.0).<br><br><strong>Fix:</strong> Changed logger to read version from <code>public/version.json</code> (the bump script\'s source of truth). Also updated the bump script to sync the version back to <code>package.json</code>.<br><br><strong>Lesson:</strong> Have a single source of truth for version numbers. If two files can hold the version, they WILL get out of sync. Either read from one, or auto-sync them.'
+  },
+  {
+    q: 'Connection test showed "not configured" even after setting env vars',
+    tag: 'Node.js',
+    a: '<strong>Symptom:</strong> After adding LOKI vars to .env and restarting, the admin dashboard\'s Test Connection still said "Loki credentials not configured."<br><br><strong>Cause:</strong> This was the module load order issue — dotenv ran AFTER the logger singleton was created. The logger constructor read empty process.env values and stored them permanently.<br><br><strong>Fix:</strong> Same as the "credentials were empty" fix: move <code>require("dotenv").config()</code> before <code>require("./logger")</code> in app.js. The singleton pattern means the constructor only runs once — the first import wins.<br><br><strong>Lesson:</strong> Node.js modules are cached after first <code>require()</code>. A singleton\'s constructor runs exactly once. Whatever state exists at that moment is locked in.'
+  },
+];
+
+function renderDebugFAQ() {
+  const container = document.getElementById('debug-faq-container');
+  container.innerHTML = debugFaqData.map((item) => `
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        <span>${item.q} <span class="faq-tag">${item.tag}</span></span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="faq-a">${item.a}</div>
+    </div>
+  `).join('');
+}
+
+function toggleFaq(el) {
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.faq-q').forEach(q => q.classList.remove('open'));
+  document.querySelectorAll('.faq-a').forEach(a => a.classList.remove('open'));
+  if (!isOpen) {
+    el.classList.add('open');
+    el.nextElementSibling.classList.add('open');
+  }
+}
+
+renderFAQ();
+renderDebugFAQ();
+
+// ═══════════ SCROLL REVEAL ═══════════
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ═══════════ QUESTION SYSTEM ═══════════
+(function(){
+  var LID='lecture03-index',SKEY='user-questions-'+LID;
+  function getQs(){return JSON.parse(localStorage.getItem(SKEY)||'{}');}
+  function saveQ(id,t){var qs=getQs();if(!qs[id])qs[id]=[];qs[id].push({text:t,ts:new Date().toISOString()});localStorage.setItem(SKEY,JSON.stringify(qs));}
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function textId(t){return t.substring(0,40).replace(/[^a-z0-9]/gi,'').toLowerCase();}
+  function showInput(el,id){
+    var ex=el.querySelector('.q-input-box');if(ex){ex.remove();return;}
+    document.querySelectorAll('.q-input-box').forEach(function(b){b.remove();});
+    var box=document.createElement('div');box.className='q-input-box';
+    box.innerHTML='<textarea placeholder="Type your question about this..." rows="2"></textarea><div class="q-input-actions"><button class="q-save-btn">💾 Save</button><button class="q-cancel-btn">✕ Cancel</button></div>';
+    box.addEventListener('click',function(e){e.stopPropagation();});
+    box.querySelector('.q-save-btn').addEventListener('click',function(e){
+      e.stopPropagation();var t=box.querySelector('textarea').value.trim();
+      if(t){saveQ(id,t);box.remove();renderSaved(el,id);updateBtn(el,id);}
+    });
+    box.querySelector('.q-cancel-btn').addEventListener('click',function(e){e.stopPropagation();box.remove();});
+    el.appendChild(box);box.querySelector('textarea').focus();
+  }
+  function renderSaved(el,id){
+    var old=el.querySelector('.q-saved-list');if(old)old.remove();
+    var qs=getQs()[id];if(!qs||!qs.length)return;
+    var list=document.createElement('div');list.className='q-saved-list';
+    list.innerHTML=qs.map(function(q){return '<div class="q-saved-item"><span>💬</span><span class="q-saved-text">'+esc(q.text)+'</span></div>';}).join('');
+    list.addEventListener('click',function(e){e.stopPropagation();});
+    el.appendChild(list);
+  }
+  function updateBtn(el,id){
+    var btn=el.querySelector('.q-ask-btn'),qs=getQs()[id];
+    if(btn&&qs&&qs.length)btn.classList.add('has-questions');
+  }
+  function addBtn(el,id){
+    if(el.querySelector('.q-ask-btn'))return;
+    el.style.position='relative';
+    var btn=document.createElement('button');btn.className='q-ask-btn';btn.textContent='?';btn.title='Ask a question about this';
+    btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();showInput(el,id);});
+    el.appendChild(btn);renderSaved(el,id);updateBtn(el,id);
+  }
+  function inject(){
+    document.querySelectorAll('.concept-card').forEach(function(el,i){addBtn(el,'concept-'+i);});
+    document.querySelectorAll('.explainer-line').forEach(function(el,i){addBtn(el,'explain-'+i);});
+    document.querySelectorAll('.flashcard').forEach(function(el){
+      var t=el.querySelector('.flashcard-front p');
+      addBtn(el,'flash-'+textId(t?t.textContent:''));
+    });
+    document.querySelectorAll('.faq-item').forEach(function(el,i){addBtn(el,'faq-'+i);});
+    document.querySelectorAll('.table-block').forEach(function(el,i){addBtn(el,'table-'+i);});
+    document.querySelectorAll('.pipeline-viz').forEach(function(el,i){addBtn(el,'pipeline-'+i);});
+  }
+  var dt;var mo=new MutationObserver(function(){clearTimeout(dt);dt=setTimeout(inject,150);});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',function(){mo.observe(document.body,{childList:true,subtree:true});});
+  setTimeout(inject,50);
+})();
+</script>
+
+</body>
+</html>

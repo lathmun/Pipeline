@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 03 Quiz — Grafana Cloud, Loki &amp; Log Shipping (60 Questions)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.7; }
+
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 6px; transition: background .2s; }
+  nav a:hover { background: rgba(88,166,255,.15); }
+  nav .title { font-weight: 700; color: var(--text); font-size: 16px; margin-right: auto; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 2em; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { color: var(--muted); margin-bottom: 32px; }
+
+  /* PROGRESS */
+  .progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; margin: 16px 0 24px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 4px; transition: width .4s ease; width: 0%; }
+  .progress-text { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+
+  /* FILTER BAR */
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .filter-btn { background: var(--surface); color: var(--muted); border: 1px solid var(--border); padding: 6px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .2s; }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: rgba(88,166,255,.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  /* QUESTION CARD */
+  .question-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 20px; transition: all .3s; }
+  .question-card.answered-correct { border-color: var(--green); }
+  .question-card.answered-wrong { border-color: var(--red); }
+  .q-category { color: var(--purple); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .q-number { color: var(--muted); font-size: 13px; float: right; }
+  .q-text { font-size: 1.1em; font-weight: 600; margin-bottom: 16px; line-height: 1.5; }
+  .q-options { display: flex; flex-direction: column; gap: 8px; }
+  .q-option { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; cursor: pointer; transition: all .2s; display: flex; align-items: flex-start; gap: 12px; }
+  .q-option:hover:not(.disabled) { border-color: var(--accent); background: rgba(88,166,255,.06); }
+  .q-option .opt-letter { background: var(--surface); border: 1px solid var(--border); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; flex-shrink: 0; }
+  .q-option.correct { border-color: var(--green); background: rgba(63,185,80,.1); }
+  .q-option.correct .opt-letter { background: var(--green); color: var(--bg); border-color: var(--green); }
+  .q-option.wrong { border-color: var(--red); background: rgba(248,81,73,.08); }
+  .q-option.wrong .opt-letter { background: var(--red); color: var(--bg); border-color: var(--red); }
+  .q-option.disabled { cursor: default; opacity: .7; }
+  .q-explanation { margin-top: 12px; padding: 12px; background: rgba(88,166,255,.06); border-radius: 8px; border-left: 3px solid var(--accent); color: var(--muted); font-size: .9em; line-height: 1.6; display: none; }
+  .q-explanation.show { display: block; }
+  .q-explanation code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: .9em; }
+
+  /* RESULTS */
+  .results-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; text-align: center; margin-top: 32px; display: none; }
+  .results-panel.show { display: block; }
+  .score-big { font-size: 4em; font-weight: 700; margin: 16px 0; }
+  .score-big.great { color: var(--green); }
+  .score-big.ok { color: var(--orange); }
+  .score-big.low { color: var(--red); }
+  .results-detail { color: var(--muted); margin: 8px 0; }
+  .results-actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
+  .btn { padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; border: none; transition: all .2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📝 Lecture 03 Quiz</span>
+  <a href="index.html">← Back to Lecture</a>
+  <a href="../lecture02/quiz.html">Lecture 02 Quiz</a>
+</nav>
+
+<div class="container">
+  <h1>Grafana Cloud, Loki &amp; Log Shipping</h1>
+  <p class="subtitle">60 questions • 6 categories • Test your understanding of everything from Lecture 03</p>
+
+  <div class="progress-text" id="progress-text">0 / 60 answered</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+  <div class="filter-bar" id="filter-bar"></div>
+
+  <div id="questions-container"></div>
+
+  <div class="results-panel" id="results-panel">
+    <h2>Quiz Complete!</h2>
+    <div class="score-big" id="score-big"></div>
+    <div class="results-detail" id="results-detail"></div>
+    <div class="results-detail" id="results-breakdown"></div>
+    <div class="results-actions">
+      <button class="btn btn-secondary" onclick="showWrong()">📋 Review Wrong Answers</button>
+      <button class="btn btn-primary" onclick="resetQuiz()">↺ Retake Quiz</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const questions = [
+  // ═══════════ CAT 1: Grafana Cloud & Loki Basics (10) ═══════════
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What does Grafana Loki index?', opts: ['Full log text like Elasticsearch', 'Only labels (key-value pairs)', 'Log level and timestamp only', 'Everything including stack traces'], ans: 1, exp: 'Loki indexes only labels — not the full log text. This is what makes it cheaper and simpler than Elasticsearch.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What query language does Loki use?', opts: ['SQL', 'PromQL', 'LogQL', 'KQL'], ans: 2, exp: 'Loki uses LogQL — inspired by PromQL (Prometheus). Start with label selectors like {app="pipeline"}, then add filters.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What are the three pillars of observability?', opts: ['Logs, metrics, traces', 'CPU, memory, disk', 'Alerts, dashboards, reports', 'Auth, authz, audit'], ans: 0, exp: 'The three pillars of observability are logs (events), metrics (measurements), and traces (request flows). Grafana Cloud supports all three.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What tool in Grafana Cloud is used to view logs?', opts: ['Prometheus', 'Tempo', 'Loki', 'Alloy'], ans: 2, exp: 'Loki is the log aggregation tool. Prometheus is for metrics, Tempo is for traces, and Alloy is a log collection agent.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'How much log data does Grafana Cloud free tier allow per month?', opts: ['1GB', '10GB', '50GB', '100GB'], ans: 2, exp: 'Grafana Cloud free tier allows 50GB of log data per month, which is generous for small to medium projects.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What makes Loki cheaper to operate than Elasticsearch?', opts: ['It uses less RAM', 'It only indexes labels, not full text', 'It compresses better', 'It runs on fewer nodes'], ans: 1, exp: 'Loki only indexes labels. Elasticsearch indexes every word in every log line. Fewer indexes = less storage and compute.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What does "observability" mean?', opts: ['Monitoring server health metrics', 'Understanding internal state from external outputs', 'Setting up alerts for failures', 'Logging everything to a database'], ans: 1, exp: 'Observability is the ability to understand your app\'s internal state by examining its outputs — logs, metrics, and traces.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'Which LogQL query shows all logs from the "pipeline" app?', opts: ['{name="pipeline"}', '{app="pipeline"}', 'SELECT * FROM pipeline', 'app:pipeline'], ans: 1, exp: 'LogQL uses label selectors in curly braces: {app="pipeline"}. This matches log streams with the "app" label set to "pipeline".' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'How does Loki handle full-text search on log content?', opts: ['Pre-built full-text index', 'Scans matching streams only (after label filter)', 'Cannot search log content', 'Uses Elasticsearch as backend'], ans: 1, exp: 'Loki first narrows by labels (fast index), then scans only the matching streams for text. No pre-built text index — this is the tradeoff for simplicity.' },
+  { cat: 'Grafana Cloud & Loki Basics', q: 'What Grafana feature lets you explore raw log data interactively?', opts: ['Dashboard', 'Explore', 'Alert Manager', 'Incidents'], ans: 1, exp: 'Grafana Explore is the interactive query interface. You select a data source (Loki), type LogQL, and see results in real time.' },
+
+  // ═══════════ CAT 2: Log Transport Modes (10) ═══════════
+  { cat: 'Log Transport Modes', q: 'What are the three transport modes supported by our logger?', opts: ['stdout, file, syslog', 'local, direct, alloy', 'console, http, udp', 'debug, info, error'], ans: 1, exp: 'Our logger supports local (stdout only), direct (stdout + HTTP push to Loki), and alloy (stdout for Grafana Alloy agent to tail).' },
+  { cat: 'Log Transport Modes', q: 'What does "local" transport mode do?', opts: ['Writes logs to a local file', 'Only outputs to stdout/stderr', 'Pushes directly to Loki', 'Sends to local syslog daemon'], ans: 1, exp: 'Local transport only writes to stdout/stderr. No Loki push, no agent needed. Best for local development.' },
+  { cat: 'Log Transport Modes', q: 'Which transport mode requires LOKI_URL, LOKI_USER, and LOKI_TOKEN?', opts: ['local', 'alloy', 'direct', 'All three'], ans: 2, exp: 'Only "direct" mode needs Loki credentials because it pushes logs via HTTP. Local doesn\'t use Loki, and alloy delegates to the agent.' },
+  { cat: 'Log Transport Modes', q: 'How do you change transport mode without restarting the server?', opts: ['Edit .env and reload', 'PUT /api/admin/transport', 'POST /api/admin/restart', 'Kill and restart pm2'], ans: 1, exp: 'Send PUT /api/admin/transport with {"transport":"direct"}. The logger switches instantly — starts/stops the flush timer as needed.' },
+  { cat: 'Log Transport Modes', q: 'Which environment variable controls the initial transport mode?', opts: ['TRANSPORT_MODE', 'LOG_TRANSPORT', 'LOKI_TRANSPORT', 'LOG_MODE'], ans: 1, exp: 'LOG_TRANSPORT environment variable. Set to "local", "direct", or "alloy". The logger reads it at startup.' },
+  { cat: 'Log Transport Modes', q: 'What happens to logs if Loki push fails in "direct" mode?', opts: ['They are queued and retried', 'The app crashes', 'They are silently dropped (but still on stdout)', 'They are written to a fallback file'], ans: 2, exp: 'Push failures are silently caught. Logs are always written to stdout first (captured by pm2), so you never lose them.' },
+  { cat: 'Log Transport Modes', q: 'When should you use "alloy" transport mode?', opts: ['For local development', 'For quick one-app setups', 'For large-scale production with agent-based shipping', 'Never — it\'s deprecated'], ans: 2, exp: 'Alloy mode is for production at scale. Grafana Alloy agent tails log files, adds labels, handles retries and buffering.' },
+  { cat: 'Log Transport Modes', q: 'In "alloy" mode, how do logs get from the app to Loki?', opts: ['App pushes directly via HTTP', 'App writes to stdout → pm2 captures to files → Alloy agent tails files → ships to Loki', 'App sends to syslog → Alloy reads syslog', 'App writes to Redis → Alloy reads Redis'], ans: 1, exp: 'The app writes JSON to stdout. pm2 captures it to log files. Grafana Alloy agent continuously tails those files and ships entries to Loki.' },
+  { cat: 'Log Transport Modes', q: 'Which transport mode has the best reliability for log delivery?', opts: ['local', 'direct', 'alloy', 'All are equal'], ans: 2, exp: 'Alloy handles retries, buffering, and backpressure. Direct mode silently drops failed batches. Local doesn\'t ship logs at all.' },
+  { cat: 'Log Transport Modes', q: 'What is the tradeoff of "direct" transport vs "alloy"?', opts: ['Direct is simpler to set up but lacks retry logic', 'Direct is more reliable but harder to configure', 'Alloy is simpler but has no buffering', 'There is no tradeoff — direct is always better'], ans: 0, exp: 'Direct = set 3 env vars and done (simple) but drops batches on failure. Alloy = install and configure agent (complex) but handles retries + buffering.' },
+
+  // ═══════════ CAT 3: Loki Push API & Authentication (10) ═══════════
+  { cat: 'Loki Push API & Auth', q: 'What is the Loki push API endpoint path?', opts: ['/api/logs/push', '/loki/api/v1/push', '/v1/loki/logs', '/api/v1/streams'], ans: 1, exp: 'The official Loki push endpoint is POST /loki/api/v1/push. Our logger appends this to the LOKI_URL base.' },
+  { cat: 'Loki Push API & Auth', q: 'What authentication method does Grafana Cloud Loki use?', opts: ['OAuth2 bearer token', 'API key in header', 'HTTP Basic Auth (user:token base64)', 'No authentication'], ans: 2, exp: 'Grafana Cloud uses HTTP Basic Auth. The Authorization header contains "Basic " + base64(LOKI_USER:LOKI_TOKEN).' },
+  { cat: 'Loki Push API & Auth', q: 'What HTTP status does Loki return on successful push?', opts: ['200 OK', '201 Created', '204 No Content', '202 Accepted'], ans: 2, exp: 'Loki returns 204 No Content on success. There\'s no response body — just an acknowledgment that the push was accepted.' },
+  { cat: 'Loki Push API & Auth', q: 'What happens when you push with a read-only token?', opts: ['200 OK with warning', '401 Unauthorized', '403 Forbidden', '500 Server Error'], ans: 2, exp: 'A read-only token returns 403 — "invalid scope requested." You need a token with write scope for pushing.' },
+  { cat: 'Loki Push API & Auth', q: 'What timestamp format does Loki expect?', opts: ['Unix seconds', 'ISO 8601 string', 'Unix milliseconds', 'Nanosecond strings'], ans: 3, exp: 'Loki expects nanosecond-precision timestamp strings. We convert JS milliseconds by appending "000000".' },
+  { cat: 'Loki Push API & Auth', q: 'How does our logger convert JS timestamps to Loki format?', opts: ['Date.toISOString()', 'Date.getTime() + "000000"', 'Math.floor(Date.now() / 1000)', 'new Date().toNanos()'], ans: 1, exp: 'JS Date.getTime() returns milliseconds. Appending "000000" gives nanoseconds: 1712345678123 → "1712345678123000000".' },
+  { cat: 'Loki Push API & Auth', q: 'What does a Loki push payload contain?', opts: ['An array of log lines', 'A "streams" array with {stream: labels, values: [[timestamp, line]]}', 'A JSON object with message and level', 'CSV formatted log data'], ans: 1, exp: 'The payload has a "streams" array. Each stream has label key-values and a "values" array of [nanosecond_timestamp, log_line] pairs.' },
+  { cat: 'Loki Push API & Auth', q: 'How are log batches flushed in our logger?', opts: ['Every log entry is sent immediately', 'When buffer hits 10 entries OR every 2 seconds', 'Every 30 seconds on a fixed timer', 'Only when the server shuts down'], ans: 1, exp: 'The buffer flushes at 10 entries or 2 seconds, whichever comes first. This balances latency (max 2s) with efficiency (fewer HTTP requests).' },
+  { cat: 'Loki Push API & Auth', q: 'What Content-Type header does the Loki push use?', opts: ['text/plain', 'application/x-protobuf', 'application/json', 'multipart/form-data'], ans: 2, exp: 'Our logger pushes JSON, so Content-Type is application/json. Loki also supports protobuf, but JSON is simpler.' },
+  { cat: 'Loki Push API & Auth', q: 'Why does our logger use Base64 encoding for credentials?', opts: ['For encryption', 'HTTP Basic Auth standard requires user:pass to be base64-encoded', 'To compress the header', 'To avoid special characters'], ans: 1, exp: 'HTTP Basic Auth standard (RFC 7617) requires the credentials to be base64-encoded. It\'s NOT encryption — just encoding.' },
+
+  // ═══════════ CAT 4: Labels, Metadata & LogQL (10) ═══════════
+  { cat: 'Labels, Metadata & LogQL', q: 'What three labels does our logger send as Loki stream labels?', opts: ['level, message, timestamp', 'app, version, environment', 'host, port, pid', 'name, type, source'], ans: 1, exp: 'Stream labels are: app (APP_NAME), version (from version.json), and environment (NODE_ENV). Used for fast filtering.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'What does "|= \\"error\\"" mean in a LogQL query?', opts: ['Equals the string "error"', 'Line contains the substring "error"', 'Level is error', 'Regex match for error'], ans: 1, exp: '|= is a line filter: it keeps only log lines containing the substring "error". For regex, use |~ instead.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'What does "| json" do in a LogQL query?', opts: ['Converts output to JSON', 'Parses the log line as JSON to extract fields', 'Filters only JSON-formatted lines', 'Prettifies the output'], ans: 1, exp: '| json is a parser that extracts fields from JSON log lines. After it, you can filter by field: | json | level="error".' },
+  { cat: 'Labels, Metadata & LogQL', q: 'Why should you NOT use high-cardinality labels?', opts: ['They slow down HTTP requests', 'They create too many streams and overwhelm Loki\'s index', 'They are not supported by LogQL', 'They increase log file size'], ans: 1, exp: 'Labels like user_id with millions of values create millions of streams. Loki\'s index grows uncontrollably. Use labels for broad categories only.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'How do you query logs from both test and master deployments?', opts: ['{app="pipeline" OR app="pipelinemaster"}', '{app=~"pipeline.*"}', '{app IN ("pipeline","pipelinemaster")}', '{app != ""}'], ans: 1, exp: 'Use regex label matching: {app=~"pipeline.*"} matches both "pipeline" and "pipelinemaster". The =~ operator enables regex.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'What is the difference between stream labels and log fields?', opts: ['Labels are indexed, fields are parsed at query time', 'Fields are indexed, labels are parsed at query time', 'No difference', 'Labels are only in Grafana, fields are in Loki'], ans: 0, exp: 'Labels are pre-indexed by Loki (fast filtering). Fields are inside the JSON log line and parsed on demand with | json.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'Where does the "app" label value come from in our logger?', opts: ['Always from package.json name', 'process.env.APP_NAME or fallback to package.json name', 'Hardcoded as "pipeline"', 'From the hostname'], ans: 1, exp: 'APP_NAME = process.env.APP_NAME || require("../package.json").name. env var takes precedence for deployments.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'Where does the "version" label value come from?', opts: ['package.json version', 'public/version.json', 'Git tag', 'Environment variable'], ans: 1, exp: 'Logger reads version from public/version.json (updated by the bump script). This is the single source of truth.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'What fields are in EVERY log entry from our logger?', opts: ['message, level only', 'timestamp, app, version, level, message', 'timestamp, message, stack', 'level, message, pid, hostname'], ans: 1, exp: 'Every entry includes timestamp (ISO), app, version, level (debug/info/warn/error), and message. Optional meta for extra context.' },
+  { cat: 'Labels, Metadata & LogQL', q: 'What is the LogQL operator to exclude lines containing a string?', opts: ['!= "text"', '|! "text"', '!~ "text"', '!= is for labels, != "text" won\'t work on lines'], ans: 0, exp: 'Use != for negative line filter: {app="pipeline"} != "health" excludes lines containing "health". For labels, also use !=.' },
+
+  // ═══════════ CAT 5: Admin Dashboard & Metrics (10) ═══════════
+  { cat: 'Admin Dashboard & Metrics', q: 'What URL serves the admin dashboard?', opts: ['/admin', '/api/admin', '/dashboard', '/api/admin/dashboard'], ans: 0, exp: 'GET /admin serves the static admin.html page. All API endpoints are under /api/admin/*.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'How does the admin dashboard authenticate users?', opts: ['Cookie-based sessions', 'OAuth2', 'HTTP Basic Auth (ADMIN_USER + ADMIN_PASS)', 'No authentication'], ans: 2, exp: 'The basicAuth middleware checks the Authorization header against ADMIN_USER and ADMIN_PASS environment variables.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'What happens if the admin request has no credentials?', opts: ['Returns 403', 'Returns 401 with WWW-Authenticate header', 'Redirects to login page', 'Returns 200 with limited data'], ans: 1, exp: 'Returns 401 with WWW-Authenticate: Basic realm="Pipeline Admin" header. This tells the browser to show a login popup.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'Which admin endpoint returns request metrics?', opts: ['GET /api/admin/metrics', 'GET /api/admin/stats', 'GET /api/admin/health', 'GET /api/admin/data'], ans: 1, exp: 'GET /api/admin/stats returns the metrics JSON object with total requests, by method, by status, auth failures, response times, etc.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'How often does the admin dashboard auto-refresh?', opts: ['Every 1 second', 'Every 5 seconds', 'Every 30 seconds', 'Only on manual refresh'], ans: 1, exp: 'JavaScript fetches /api/admin/stats and /api/admin/logs every 5 seconds via setInterval.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'What does the "Test Connection" button on the admin dashboard do?', opts: ['Pings the server health endpoint', 'Pushes a test log to Loki and reports success/failure', 'Tests the database connection', 'Validates the API token format'], ans: 1, exp: 'It calls POST /api/admin/test-loki, which pushes a single test entry to Loki and returns {ok, status, message}.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'How is P95 response time calculated?', opts: ['Average of the slowest 5%', 'Median × 1.5', 'Sort durations, take value at 95th percentile', 'Max response time minus 5%'], ans: 2, exp: 'Sort all recorded durations, pick the value at the 95th percentile position. 95% of requests are faster than this value.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'What is the maximum number of recent logs kept in memory?', opts: ['50', '100', '200', '1000'], ans: 2, exp: 'The logger uses a ring buffer of 200 entries. When full, the oldest entry is dropped. Served by GET /api/admin/logs.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'Are the in-memory metrics persistent across server restarts?', opts: ['Yes, saved to disk', 'Yes, saved to Loki', 'No, reset on restart', 'Only if NODE_ENV=production'], ans: 2, exp: 'Metrics are in-memory only. They reset when pm2 restarts the process. The admin dashboard has a manual "Reset Metrics" button too.' },
+  { cat: 'Admin Dashboard & Metrics', q: 'What metrics are tracked per route?', opts: ['Only hit count', 'Hit count and average response time', 'Hit count per route (top 20)', 'All metrics per route'], ans: 2, exp: 'The metrics collector tracks top 20 routes by hit count. Response time stats (avg, min, max, p95) are global, not per-route.' },
+
+  // ═══════════ CAT 6: Security & Production Config (10) ═══════════
+  { cat: 'Security & Production Config', q: 'Where are Loki credentials stored for CI/CD deployment?', opts: ['In .env file in the repo', 'As GitHub Secrets', 'In a database', 'Hardcoded in deployment scripts'], ans: 1, exp: 'LOKI_URL, LOKI_USER, LOKI_TOKEN are GitHub Secrets. The deploy workflow injects them into ecosystem.config.js on the server.' },
+  { cat: 'Security & Production Config', q: 'Why does pm2 NOT read .env files?', opts: ['It\'s a Node.js limitation', 'pm2 uses ecosystem.config.js for env var management', '.env files are for web browsers', 'pm2 only runs Python'], ans: 1, exp: 'pm2 has its own env var system through ecosystem.config.js. The dotenv + .env approach only works when running node directly.' },
+  { cat: 'Security & Production Config', q: 'What is ecosystem.config.js?', opts: ['A Jest configuration file', 'A pm2 config defining app name, script, and env vars', 'A Webpack bundle config', 'A Grafana dashboard config'], ans: 1, exp: 'ecosystem.config.js is pm2\'s configuration file. Defines app name, script path, environment variables, and process options.' },
+  { cat: 'Security & Production Config', q: 'Why did we change the local dev port from 5000 to 5050?', opts: ['5000 is reserved for HTTPS', 'macOS AirPlay Receiver uses port 5000', '5000 is blocked by firewalls', 'Express doesn\'t support port 5000'], ans: 1, exp: 'macOS AirPlay Receiver occupies port 5000 by default. We got AirTunes responses instead of our API. Changed to 5050 for local dev.' },
+  { cat: 'Security & Production Config', q: 'How do deploy workflows inject secrets into the server?', opts: ['SSH and edit .env directly', 'Write secrets into ecosystem.config.js using GitHub Actions env vars', 'Upload encrypted files', 'Use Vault or AWS Secrets Manager'], ans: 1, exp: 'The workflow maps GitHub Secrets to env vars in the step, then uses them in the SSH command to generate ecosystem.config.js.' },
+  { cat: 'Security & Production Config', q: 'Why must dotenv.config() run BEFORE requiring the logger?', opts: ['Node.js requires it for security', 'The logger singleton reads env vars at import time — once', 'dotenv must be first in any Node.js app', 'To avoid circular dependencies'], ans: 1, exp: 'The logger is a singleton. Its constructor runs once at first require(). If env vars aren\'t loaded yet, the logger gets empty credentials permanently.' },
+  { cat: 'Security & Production Config', q: 'What happens if LOKI_TOKEN has a read-only scope?', opts: ['Logs are delivered but with a warning', 'Push returns 403 and logs are dropped silently', 'The server crashes on startup', 'Loki stores the logs as read-only'], ans: 1, exp: 'Read-only tokens return 403 on push. The logger catches the error silently. You need a write-scoped token.' },
+  { cat: 'Security & Production Config', q: 'How do you differentiate test vs master logs in Grafana?', opts: ['Different Loki instances', 'Different APP_NAME env var: "pipeline" vs "pipelinemaster"', 'Different log levels', 'Different Grafana data sources'], ans: 1, exp: 'Test branch logs as app="pipeline", master as app="pipelinemaster" (set via APP_NAME env var in ecosystem.config.js).' },
+  { cat: 'Security & Production Config', q: 'How does the bump script keep versions in sync?', opts: ['Only updates package.json', 'Updates version.json AND syncs to package.json', 'Uses git tags as source of truth', 'Reads from environment variable'], ans: 1, exp: 'The bump script updates public/version.json (primary) and also syncs the version to package.json. One source of truth, two files in sync.' },
+  { cat: 'Security & Production Config', q: 'What is the WWW-Authenticate header and why was it missing?', opts: ['A cookie for auth — missing due to CORS', 'Tells browser to show login popup — we forgot to include it in our 401 responses', 'Encrypts the password — browser didn\'t support it', 'Validates the token — server config was wrong'], ans: 1, exp: 'Without WWW-Authenticate: Basic realm="..." header in 401 responses, the browser doesn\'t show a login popup. We added it to both 401 paths.' },
+];
+
+// ═══════════ QUIZ ENGINE ═══════════
+let answered = 0, correct = 0, currentFilter = 'All';
+const categories = ['All', ...new Set(questions.map(q => q.cat))];
+const letters = ['A', 'B', 'C', 'D'];
+const answerState = new Array(questions.length).fill(-1);
+
+function renderFilters() {
+  document.getElementById('filter-bar').innerHTML = categories.map(cat => `<button class="filter-btn${cat === currentFilter ? ' active' : ''}" onclick="filterBy('${cat}')">${cat}${cat === 'All' ? ' (' + questions.length + ')' : ' (' + questions.filter(q => q.cat === cat).length + ')'}</button>`).join('');
+}
+
+function filterBy(cat) {
+  currentFilter = cat;
+  renderFilters();
+  renderQuestions();
+}
+
+function renderQuestions() {
+  const container = document.getElementById('questions-container');
+  const filtered = questions.map((q, i) => ({ ...q, idx: i })).filter(q => currentFilter === 'All' || q.cat === currentFilter);
+  container.innerHTML = filtered.map((q) => {
+    const state = answerState[q.idx];
+    let cardClass = 'question-card';
+    if (state >= 0) cardClass += state === q.ans ? ' answered-correct' : ' answered-wrong';
+    return `
+      <div class="${cardClass}" id="qcard-${q.idx}">
+        <div class="q-category">${q.cat}</div>
+        <span class="q-number">#${q.idx + 1}</span>
+        <div class="q-text">${q.q}</div>
+        <div class="q-options">${q.opts.map((opt, oi) => {
+          let optClass = 'q-option';
+          if (state >= 0) {
+            optClass += ' disabled';
+            if (oi === q.ans) optClass += ' correct';
+            else if (oi === state && state !== q.ans) optClass += ' wrong';
+          }
+          return `<div class="${optClass}" onclick="answer(${q.idx},${oi})"><span class="opt-letter">${letters[oi]}</span><span>${opt}</span></div>`;
+        }).join('')}</div>
+        <div class="q-explanation${state >= 0 ? ' show' : ''}" id="qexp-${q.idx}">${q.exp}</div>
+      </div>`;
+  }).join('');
+}
+
+function answer(qi, oi) {
+  if (answerState[qi] >= 0) return;
+  answerState[qi] = oi;
+  answered++;
+  if (oi === questions[qi].ans) correct++;
+  updateProgress();
+  renderQuestions();
+  if (answered === questions.length) finishQuiz();
+}
+
+function updateProgress() {
+  document.getElementById('progress-text').textContent = `${answered} / ${questions.length} answered — ${correct} correct`;
+  document.getElementById('progress-fill').style.width = (answered / questions.length * 100) + '%';
+}
+
+function finishQuiz() {
+  const pct = Math.round(correct / questions.length * 100);
+  const panel = document.getElementById('results-panel');
+  const score = document.getElementById('score-big');
+  score.textContent = pct + '%';
+  score.className = 'score-big ' + (pct >= 80 ? 'great' : pct >= 50 ? 'ok' : 'low');
+  document.getElementById('results-detail').textContent = `${correct} correct out of ${questions.length} questions`;
+  const breakdown = categories.slice(1).map(cat => {
+    const qs = questions.map((q, i) => ({ ...q, idx: i })).filter(q => q.cat === cat);
+    const c = qs.filter(q => answerState[q.idx] === q.ans).length;
+    return `${cat}: ${c}/${qs.length}`;
+  }).join(' • ');
+  document.getElementById('results-breakdown').textContent = breakdown;
+  panel.classList.add('show');
+}
+
+function showWrong() {
+  currentFilter = 'All';
+  renderFilters();
+  renderQuestions();
+  const firstWrong = questions.findIndex((q, i) => answerState[i] >= 0 && answerState[i] !== q.ans);
+  if (firstWrong >= 0) document.getElementById('qcard-' + firstWrong).scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetQuiz() {
+  answered = 0; correct = 0; answerState.fill(-1); currentFilter = 'All';
+  document.getElementById('results-panel').classList.remove('show');
+  renderFilters(); renderQuestions(); updateProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+renderFilters();
+renderQuestions();
+updateProgress();
+
+// ═══════════ QUESTION SYSTEM ═══════════
+(function(){
+  var LID='lecture03-quiz',SKEY='user-questions-'+LID;
+  function getQs(){return JSON.parse(localStorage.getItem(SKEY)||'{}');}
+  function saveQ(id,t){var qs=getQs();if(!qs[id])qs[id]=[];qs[id].push({text:t,ts:new Date().toISOString()});localStorage.setItem(SKEY,JSON.stringify(qs));}
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function showInput(el,id){
+    var ex=el.querySelector('.q-input-box');if(ex){ex.remove();return;}
+    document.querySelectorAll('.q-input-box').forEach(function(b){b.remove();});
+    var box=document.createElement('div');box.className='q-input-box';
+    box.innerHTML='<textarea placeholder="Type your question..." rows="2"></textarea><div class="q-input-actions"><button class="q-save-btn">💾 Save</button><button class="q-cancel-btn">✕</button></div>';
+    box.addEventListener('click',function(e){e.stopPropagation();});
+    box.querySelector('.q-save-btn').addEventListener('click',function(e){
+      e.stopPropagation();var t=box.querySelector('textarea').value.trim();
+      if(t){saveQ(id,t);box.remove();renderSaved(el,id);updateBtn(el,id);}
+    });
+    box.querySelector('.q-cancel-btn').addEventListener('click',function(e){e.stopPropagation();box.remove();});
+    el.appendChild(box);box.querySelector('textarea').focus();
+  }
+  function renderSaved(el,id){
+    var old=el.querySelector('.q-saved-list');if(old)old.remove();
+    var qs=getQs()[id];if(!qs||!qs.length)return;
+    var list=document.createElement('div');list.className='q-saved-list';
+    list.innerHTML=qs.map(function(q){return '<div class="q-saved-item"><span>💬</span><span class="q-saved-text">'+esc(q.text)+'</span></div>';}).join('');
+    list.addEventListener('click',function(e){e.stopPropagation();});
+    el.appendChild(list);
+  }
+  function updateBtn(el,id){
+    var btn=el.querySelector('.q-ask-btn'),qs=getQs()[id];
+    if(btn&&qs&&qs.length)btn.classList.add('has-questions');
+  }
+  function addBtn(el,id){
+    if(el.querySelector('.q-ask-btn'))return;
+    el.style.position='relative';
+    var btn=document.createElement('button');btn.className='q-ask-btn';btn.textContent='?';btn.title='Ask a question';
+    btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();showInput(el,id);});
+    el.appendChild(btn);renderSaved(el,id);updateBtn(el,id);
+  }
+  function inject(){
+    document.querySelectorAll('.question-card').forEach(function(el,i){addBtn(el,'qcard-'+i);});
+  }
+  var dt;var mo=new MutationObserver(function(){clearTimeout(dt);dt=setTimeout(inject,150);});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',function(){mo.observe(document.body,{childList:true,subtree:true});});
+  setTimeout(inject,50);
+})();
+</script>
+
+<style>
+  .q-ask-btn { position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--orange); background:var(--surface); color:var(--orange); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:10; transition:all .2s; opacity:.7; line-height:1; padding:0; }
+  .q-ask-btn:hover { opacity:1; background:rgba(210,153,34,.2); transform:scale(1.15); }
+  .q-ask-btn.has-questions { opacity:1; background:rgba(210,153,34,.18); }
+  .q-input-box { background:var(--bg); border:1px solid var(--orange); border-radius:8px; padding:12px; margin-top:12px; }
+  .q-input-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:inherit; font-size:14px; resize:vertical; min-height:60px; }
+  .q-input-box textarea:focus { outline:none; border-color:var(--orange); }
+  .q-input-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .q-input-actions button { padding:5px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; border:none; }
+  .q-input-actions .q-save-btn { background:var(--orange); color:#0d1117; }
+  .q-input-actions .q-cancel-btn { background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .q-saved-list { margin-top:8px; }
+  .q-saved-item { display:flex; gap:8px; align-items:flex-start; padding:5px 10px; background:rgba(210,153,34,.06); border-left:2px solid var(--orange); border-radius:0 6px 6px 0; margin:4px 0; font-size:.82em; }
+  .q-saved-text { color:var(--muted); line-height:1.5; }
+</style>
+
+</body>
+</html>

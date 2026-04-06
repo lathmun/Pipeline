@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bonus — Deep Dive into logger.js</title>
+<!-- Author: GitHub Copilot -->
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.7; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  nav a { color: var(--accent); text-decoration: none; font-size: 14px; padding: 4px 12px; border-radius: 6px; transition: background .2s; }
+  nav a:hover { background: rgba(88,166,255,.15); }
+  nav .title { font-weight: 700; color: var(--text); font-size: 16px; margin-right: auto; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  /* SECTIONS */
+  section { margin-bottom: 64px; }
+  h1 { font-size: 2.4em; margin-bottom: 8px; background: linear-gradient(135deg, var(--orange), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.8em; color: var(--accent); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.3em; color: var(--purple); margin: 24px 0 12px; }
+  p, li { color: var(--text); margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 1.1em; margin-bottom: 32px; }
+
+  /* CONCEPT CARDS */
+  .concepts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 16px; }
+  .concept-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: transform .2s, box-shadow .2s; }
+  .concept-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .concept-card .icon { font-size: 2em; margin-bottom: 12px; }
+  .concept-card h4 { color: var(--accent); margin-bottom: 8px; font-size: 1.1em; }
+  .concept-card p { color: var(--muted); font-size: .95em; line-height: 1.6; }
+
+  /* CODE BLOCKS */
+  .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; overflow-x: auto; font-family: 'Fira Code', 'Consolas', monospace; font-size: 14px; line-height: 1.8; position: relative; }
+  .code-block .line { display: block; }
+  .code-block .line:hover { background: rgba(88,166,255,.06); }
+  .code-block .comment { color: var(--muted); font-style: italic; }
+  .code-block .keyword { color: var(--pink); }
+  .code-block .string { color: var(--green); }
+  .code-block .key { color: var(--purple); }
+  .code-block .label { position: absolute; top: 8px; right: 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* PIPELINE VISUALIZATION */
+  .pipeline-viz { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin: 20px 0; overflow-x: auto; }
+  .pipeline-flow { display: flex; align-items: center; gap: 0; justify-content: center; flex-wrap: wrap; min-height: 120px; }
+  .pipeline-step { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 130px; transition: all .4s ease; position: relative; }
+  .pipeline-step .step-icon { font-size: 1.8em; margin-bottom: 6px; }
+  .pipeline-step .step-name { font-weight: 600; font-size: .9em; }
+  .pipeline-step .step-detail { color: var(--muted); font-size: .75em; margin-top: 4px; }
+  .pipeline-arrow { font-size: 1.5em; color: var(--muted); padding: 0 8px; flex-shrink: 0; }
+  .pipeline-step.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(88,166,255,.3); }
+  .pipeline-step.done { border-color: var(--green); }
+  .pipeline-step.done .step-icon::after { content: ' ✅'; font-size: .6em; }
+  .pipeline-step.paused { border-color: var(--orange); box-shadow: 0 0 20px rgba(210,153,34,.3); }
+
+  .anim-controls { display: flex; gap: 12px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+  .anim-btn { background: var(--accent); color: #fff; border: none; padding: 8px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background .2s; }
+  .anim-btn:hover { background: #79c0ff; }
+  .anim-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .anim-btn.secondary:hover { border-color: var(--accent); }
+  .anim-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .pipeline-status { text-align: center; margin-top: 12px; font-size: .95em; min-height: 48px; color: var(--muted); line-height: 1.6; }
+
+  /* LINE-BY-LINE EXPLAINER */
+  .explainer { margin: 20px 0; }
+  .explainer-line { display: flex; gap: 16px; padding: 8px 12px; border-radius: 8px; margin: 2px 0; transition: background .2s; cursor: pointer; align-items: flex-start; }
+  .explainer-line:hover { background: rgba(88,166,255,.08); }
+  .explainer-line.highlight { background: rgba(88,166,255,.12); border-left: 3px solid var(--accent); }
+  .explainer-code { font-family: 'Fira Code', 'Consolas', monospace; font-size: 13px; white-space: pre; flex-shrink: 0; min-width: 420px; color: var(--text); }
+  .explainer-desc { color: var(--muted); font-size: 13px; line-height: 1.6; border-left: 2px solid var(--border); padding-left: 12px; }
+  .explainer-line .line-num { color: var(--muted); font-size: 12px; font-family: monospace; min-width: 28px; text-align: right; flex-shrink: 0; user-select: none; }
+
+  /* STRUCTURE DIAGRAM */
+  .struct-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin: 20px 0; }
+  .struct-tree { font-family: 'Fira Code', 'Consolas', monospace; font-size: 14px; line-height: 2.2; }
+  .struct-tree .node { display: inline-block; padding: 4px 14px; border-radius: 8px; margin: 2px 0; }
+  .struct-tree .node-class { background: rgba(88,166,255,.15); color: var(--accent); border: 1px solid var(--accent); }
+  .struct-tree .node-public { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid var(--green); }
+  .struct-tree .node-private { background: rgba(248,81,73,.1); color: var(--red); border: 1px solid var(--red); }
+  .struct-tree .node-const { background: rgba(188,140,255,.12); color: var(--purple); border: 1px solid var(--purple); }
+  .struct-tree .node-export { background: rgba(210,153,34,.12); color: var(--orange); border: 1px solid var(--orange); }
+  .struct-tree .indent { display: inline-block; }
+  .struct-tree .branch { color: var(--muted); }
+  .struct-tree .desc { color: var(--muted); font-size: 12px; font-family: -apple-system, sans-serif; margin-left: 12px; }
+
+  /* FLASH CARDS */
+  .flashcard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .flashcard { perspective: 1000px; height: 220px; cursor: pointer; }
+  .flashcard-inner { position: relative; width: 100%; height: 100%; transition: transform .6s; transform-style: preserve-3d; }
+  .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+  .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .flashcard-front { background: linear-gradient(135deg, #1a1f36, #161b22); border: 2px solid var(--accent); }
+  .flashcard-front .q-label { color: var(--accent); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-front p { font-size: 1.1em; font-weight: 500; }
+  .flashcard-back { background: linear-gradient(135deg, #0f2d1a, #161b22); border: 2px solid var(--green); transform: rotateY(180deg); }
+  .flashcard-back .a-label { color: var(--green); font-size: .75em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .flashcard-back p { font-size: .95em; color: var(--text); line-height: 1.6; }
+  .flashcard-hint { color: var(--muted); font-size: .75em; margin-top: 12px; }
+
+  /* COMPARISON TABLE */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th, td { padding: 12px 16px; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+  td { background: var(--bg); }
+  tr:hover td { background: rgba(88,166,255,.04); }
+  .table-block { position:relative; margin:16px 0; }
+
+  /* QUIZ SECTION */
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; margin: 20px 0; }
+  .quiz-q { font-weight: 600; font-size: 1.05em; margin-bottom: 14px; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .quiz-opt { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 12px; }
+  .quiz-opt:hover:not(.disabled) { border-color: var(--accent); background: rgba(88,166,255,.06); }
+  .quiz-opt .opt-letter { background: var(--surface); border: 1px solid var(--border); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; flex-shrink: 0; }
+  .quiz-opt.correct { border-color: var(--green); background: rgba(63,185,80,.1); }
+  .quiz-opt.correct .opt-letter { background: var(--green); color: var(--bg); border-color: var(--green); }
+  .quiz-opt.wrong { border-color: var(--red); background: rgba(248,81,73,.08); }
+  .quiz-opt.wrong .opt-letter { background: var(--red); color: var(--bg); border-color: var(--red); }
+  .quiz-opt.disabled { cursor: default; opacity: .7; }
+  .quiz-exp { display: none; margin-top: 8px; padding: 12px; background: rgba(88,166,255,.06); border-radius: 8px; border-left: 3px solid var(--accent); color: var(--muted); font-size: .9em; line-height: 1.6; }
+  .quiz-exp.show { display: block; }
+  .quiz-exp code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: .9em; }
+  .quiz-score { text-align: center; padding: 24px; margin-top: 24px; border-radius: 12px; border: 1px solid var(--border); display: none; }
+  .quiz-score.show { display: block; }
+  .quiz-score .big { font-size: 3em; font-weight: 700; }
+  .quiz-score .big.great { color: var(--green); }
+  .quiz-score .big.mid { color: var(--orange); }
+  .quiz-score .big.low { color: var(--red); }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: .75em; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+  .badge-orange { background: rgba(210,153,34,.15); color: var(--orange); }
+  .badge-purple { background: rgba(188,140,255,.12); color: var(--purple); }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .explainer-line { flex-direction: column; gap: 4px; }
+    .explainer-code { min-width: unset; font-size: 12px; }
+    .pipeline-flow { flex-direction: column; }
+    .pipeline-arrow { transform: rotate(90deg); }
+    nav { padding: 8px 12px; }
+    h1 { font-size: 1.8em; }
+  }
+
+  /* SCROLL ANIMATION */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s, transform .6s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* QUESTION SYSTEM */
+  .q-ask-btn { position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--orange); background:var(--surface); color:var(--orange); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:10; transition:all .2s; opacity:.7; line-height:1; padding:0; font-family:inherit; }
+  .q-ask-btn:hover { opacity:1; border-color:var(--orange); background:rgba(210,153,34,.2); transform:scale(1.15); }
+  .q-ask-btn.has-questions { opacity:1; background:rgba(210,153,34,.18); border-color:var(--orange); }
+  .q-input-box { background:var(--bg); border:1px solid var(--orange); border-radius:8px; padding:12px; margin-top:12px; position:relative; z-index:20; }
+  .q-input-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:inherit; font-size:14px; resize:vertical; min-height:60px; }
+  .q-input-box textarea:focus { outline:none; border-color:var(--orange); }
+  .q-input-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .q-input-actions button { padding:5px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; border:none; }
+  .q-input-actions .q-save-btn { background:var(--orange); color:#0d1117; }
+  .q-input-actions .q-save-btn:hover { background:#e5ac30; }
+  .q-input-actions .q-cancel-btn { background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .q-input-actions .q-cancel-btn:hover { border-color:var(--orange) !important; }
+  .q-saved-list { margin-top:8px; }
+  .q-saved-item { display:flex; gap:8px; align-items:flex-start; padding:5px 10px; background:rgba(210,153,34,.06); border-left:2px solid var(--orange); border-radius:0 6px 6px 0; margin:4px 0; font-size:.82em; }
+  .q-saved-item span:first-child { flex-shrink:0; }
+  .q-saved-text { color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">🎁 Bonus — logger.js Deep Dive</span>
+  <a href="#structure">Structure</a>
+  <a href="#flow-anim">Animated Flow</a>
+  <a href="#concepts">Concepts</a>
+  <a href="#code-explained">Code Explained</a>
+  <a href="#flashcards">Flash Cards</a>
+  <a href="#quiz">Quiz</a>
+  <a href="index.html">← Lecture 03</a>
+  <a href="quiz.html">📝 Full Quiz</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════ HERO ═══════════ -->
+<section>
+  <h1>🎁 Bonus: Deep Dive into logger.js</h1>
+  <p class="subtitle">A complete walkthrough of <code>src/logger.js</code> — how it's structured, how every log request flows through it, and the design decisions behind transport modes, Loki batching, the ring buffer, the singleton pattern, and graceful shutdown.</p>
+</section>
+
+<!-- ═══════════ 1. FILE STRUCTURE ═══════════ -->
+<section id="structure" class="reveal">
+  <h2>🏗️ How logger.js Is Structured</h2>
+  <p>The file is 250 lines organized into clear layers. Here's the full anatomy:</p>
+
+  <div class="struct-box">
+    <div class="struct-tree">
+      <div><span class="node node-const">LEVELS</span> <span class="desc">{ debug: 0, info: 1, warn: 2, error: 3 } — numeric priority for filtering</span></div>
+      <div><span class="node node-const">TRANSPORTS</span> <span class="desc">['local', 'direct', 'alloy'] — allowed transport modes</span></div>
+      <div><span class="node node-const">APP_NAME</span> <span class="desc">process.env.APP_NAME || package.json name — identifies this app in Loki</span></div>
+      <div><span class="node node-const">APP_VERSION</span> <span class="desc">version.json — tracks release version in every log entry</span></div>
+      <div style="margin-top:16px;"><span class="node node-class">class Logger</span></div>
+      <div><span class="branch">&nbsp;&nbsp;├─</span> <span class="node node-class">constructor(options)</span> <span class="desc">Sets level, transport, Loki creds, buffer, flush timer, ring buffer</span></div>
+      <div><span class="branch">&nbsp;&nbsp;├─</span> <strong style="color:var(--green)">Public API</strong></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-public">debug(msg, meta)</span> <span class="desc">→ _log('debug', ...)</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-public">info(msg, meta)</span> <span class="desc">→ _log('info', ...)</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-public">warn(msg, meta)</span> <span class="desc">→ _log('warn', ...)</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;└─</span> <span class="node node-public">error(msg, meta)</span> <span class="desc">→ _log('error', ...)</span></div>
+      <div><span class="branch">&nbsp;&nbsp;├─</span> <strong style="color:var(--accent)">Transport Management</strong></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-public">getTransport()</span> <span class="desc">Returns current mode: 'local'|'direct'|'alloy'</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-public">setTransport(mode)</span> <span class="desc">Switch at runtime, auto-starts/stops flush timer</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;└─</span> <span class="node node-public">getRecentLogs(count)</span> <span class="desc">Returns last N entries from ring buffer</span></div>
+      <div><span class="branch">&nbsp;&nbsp;├─</span> <strong style="color:var(--accent)">Loki Connection Test</strong></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;└─</span> <span class="node node-public">testLokiConnection()</span> <span class="desc">Promise → { ok, status, message }</span></div>
+      <div><span class="branch">&nbsp;&nbsp;├─</span> <strong style="color:var(--red)">Internal Methods</strong></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-private">_log(level, msg, meta)</span> <span class="desc">Build entry, check level, push to ring buffer, call _write()</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-private">_write(level, entry)</span> <span class="desc">stdout/stderr + optional Loki buffer add</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-private">_startFlushTimer()</span> <span class="desc">setInterval(2s) with .unref()</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-private">_stopFlushTimer()</span> <span class="desc">clearInterval</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;├─</span> <span class="node node-private">_flushLoki()</span> <span class="desc">Splice buffer, call _pushToLoki(batch)</span></div>
+      <div><span class="branch">&nbsp;&nbsp;│&nbsp;&nbsp;└─</span> <span class="node node-private">_pushToLoki(entries)</span> <span class="desc">HTTP POST to /loki/api/v1/push with Basic Auth</span></div>
+      <div><span class="branch">&nbsp;&nbsp;└─</span> <span class="node node-public">destroy()</span> <span class="desc">Graceful shutdown: stop timer, flush remaining buffer</span></div>
+      <div style="margin-top:16px;"><span class="node node-export">module.exports = new Logger()</span> <span class="desc">← Singleton! One instance shared across the whole app</span></div>
+    </div>
+  </div>
+
+  <h3>Key Design Decisions</h3>
+  <div class="table-block">
+  <table>
+    <tr><th>Decision</th><th>What</th><th>Why</th></tr>
+    <tr><td><span class="badge badge-purple">Singleton</span></td><td><code>module.exports = new Logger()</code></td><td>Every file that does <code>require('./logger')</code> gets the same instance. One config, one buffer, one timer — no duplication.</td></tr>
+    <tr><td><span class="badge badge-green">_ prefix</span></td><td>All internal methods start with <code>_</code></td><td>Convention to signal "don't call this directly." JavaScript has no private keyword (pre-ES2022), so _ is the standard marker.</td></tr>
+    <tr><td><span class="badge badge-blue">Level numbers</span></td><td><code>{ debug: 0, info: 1, warn: 2, error: 3 }</code></td><td>Simple numeric comparison: <code>if (LEVELS[level] < this.level) return</code>. Set level to "warn" → only warn (2) and error (3) pass.</td></tr>
+    <tr><td><span class="badge badge-orange">Top-level consts</span></td><td>APP_NAME, APP_VERSION outside the class</td><td>Read once at module load. Never change. Available to the class and any future additions without re-reading files.</td></tr>
+    <tr><td><span class="badge badge-red">Silent failures</span></td><td><code>.catch(() => {})</code> on Loki push</td><td>Logging should NEVER crash the app. If Loki is down, logs are on stdout anyway. The app marches on.</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════ 2. ANIMATED FLOW — LOG REQUEST ═══════════ -->
+<section id="flow-anim" class="reveal">
+  <h2>🔄 Animated Flow — A Log Request's Journey</h2>
+  <p>Watch exactly what happens when your app calls <code>log.info("Item created", { id: 4 })</code> with <strong>direct</strong> transport mode.</p>
+
+  <h3>Flow 1: log.info() → stdout + Loki Buffer</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="flow1">
+      <div class="pipeline-step" id="f1-call">
+        <div class="step-icon">📞</div>
+        <div class="step-name">log.info()</div>
+        <div class="step-detail">Public API call</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f1-log">
+        <div class="step-icon">🔍</div>
+        <div class="step-name">_log()</div>
+        <div class="step-detail">Check level, build entry</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f1-ring">
+        <div class="step-icon">💾</div>
+        <div class="step-name">Ring Buffer</div>
+        <div class="step-detail">Push to _recentLogs[200]</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f1-write">
+        <div class="step-icon">✍️</div>
+        <div class="step-name">_write()</div>
+        <div class="step-detail">JSON.stringify → stdout</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f1-buffer">
+        <div class="step-icon">📦</div>
+        <div class="step-name">Loki Buffer</div>
+        <div class="step-detail">Push to _lokiBuffer[]</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="flow1-status">Click ▶ Play to walk through log.info() step by step</div>
+    <div class="anim-controls">
+      <button class="anim-btn" id="f1-play" onclick="flow1Play()">▶ Play</button>
+      <button class="anim-btn secondary" id="f1-pause" onclick="flow1Pause()" disabled>⏸ Pause</button>
+      <button class="anim-btn secondary" onclick="flow1Step()">⏭ Step</button>
+      <button class="anim-btn secondary" onclick="flow1Reset()">↺ Reset</button>
+    </div>
+  </div>
+
+  <h3>Flow 2: Buffer Flush → Loki Push → Grafana</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="flow2">
+      <div class="pipeline-step" id="f2-timer">
+        <div class="step-icon">⏱️</div>
+        <div class="step-name">Flush Timer</div>
+        <div class="step-detail">Every 2s or 10 entries</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f2-flush">
+        <div class="step-icon">🔄</div>
+        <div class="step-name">_flushLoki()</div>
+        <div class="step-detail">splice(0) → get batch</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f2-push">
+        <div class="step-icon">📡</div>
+        <div class="step-name">_pushToLoki()</div>
+        <div class="step-detail">Build payload, auth, POST</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f2-loki">
+        <div class="step-icon">📋</div>
+        <div class="step-name">Loki (204)</div>
+        <div class="step-detail">Index labels, store log</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f2-grafana">
+        <div class="step-icon">📊</div>
+        <div class="step-name">Grafana</div>
+        <div class="step-detail">Query with LogQL</div>
+      </div>
+    </div>
+    <div class="pipeline-status" id="flow2-status">Click ▶ Play to watch the buffer flush and Loki push</div>
+    <div class="anim-controls">
+      <button class="anim-btn" id="f2-play" onclick="flow2Play()">▶ Play</button>
+      <button class="anim-btn secondary" id="f2-pause" onclick="flow2Pause()" disabled>⏸ Pause</button>
+      <button class="anim-btn secondary" onclick="flow2Step()">⏭ Step</button>
+      <button class="anim-btn secondary" onclick="flow2Reset()">↺ Reset</button>
+    </div>
+  </div>
+
+  <h3>Flow 3: Level Filtering — What Gets Dropped?</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="flow3">
+      <div class="pipeline-step" id="f3-debug">
+        <div class="step-icon">🔵</div>
+        <div class="step-name">debug()</div>
+        <div class="step-detail">LEVELS.debug = 0</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f3-check">
+        <div class="step-icon">🚦</div>
+        <div class="step-name">Level Gate</div>
+        <div class="step-detail">0 < this.level (1)?</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f3-drop">
+        <div class="step-icon">🗑️</div>
+        <div class="step-name">DROPPED</div>
+        <div class="step-detail">return; — never written</div>
+      </div>
+    </div>
+    <div class="pipeline-status">With <code>LOG_LEVEL=info</code> (default, level=1): debug (0) is dropped, info (1), warn (2), error (3) all pass the gate. With <code>LOG_LEVEL=error</code> (level=3): only error (3) passes — debug, info, warn all dropped.</div>
+  </div>
+
+  <h3>Flow 4: Error vs Non-Error — stdout vs stderr</h3>
+  <div class="pipeline-viz">
+    <div class="pipeline-flow" id="flow4">
+      <div class="pipeline-step" id="f4-write">
+        <div class="step-icon">✍️</div>
+        <div class="step-name">_write()</div>
+        <div class="step-detail">JSON.stringify(entry)</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step" id="f4-check">
+        <div class="step-icon">❓</div>
+        <div class="step-name">level === 'error'?</div>
+        <div class="step-detail">Branch decision</div>
+      </div>
+      <div class="pipeline-arrow" style="opacity:0">→</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="pipeline-step" id="f4-stderr" style="border-color:var(--red);">
+          <div class="step-icon">🔴</div>
+          <div class="step-name">stderr</div>
+          <div class="step-detail">process.stderr.write()</div>
+        </div>
+        <div class="pipeline-step" id="f4-stdout" style="border-color:var(--green);">
+          <div class="step-icon">🟢</div>
+          <div class="step-name">stdout</div>
+          <div class="step-detail">process.stdout.write()</div>
+        </div>
+      </div>
+    </div>
+    <div class="pipeline-status">Errors go to <strong>stderr</strong> (file descriptor 2), everything else to <strong>stdout</strong> (fd 1). This matters because pm2 captures them to separate files: <code>*-error.log</code> vs <code>*-out.log</code>. In Grafana Alloy, you can apply different labels to each.</div>
+  </div>
+</section>
+
+<!-- ═══════════ 3. CORE CONCEPTS ═══════════ -->
+<section id="concepts" class="reveal">
+  <h2>🧠 Core Concepts — Inside logger.js</h2>
+  <div class="concepts-grid">
+    <div class="concept-card">
+      <div class="icon">🔢</div>
+      <h4>Log Levels as Numbers</h4>
+      <p><code>{ debug:0, info:1, warn:2, error:3 }</code>. The logger compares the incoming level's number against <code>this.level</code>. If the number is too low, the log is silently dropped. This single comparison is the <strong>entire</strong> filtering mechanism — no if/else chains, no switch statements.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🚛</div>
+      <h4>Transport Modes</h4>
+      <p><strong>local</strong> = stdout only (dev). <strong>direct</strong> = stdout + HTTP push to Loki (quick setup). <strong>alloy</strong> = stdout only (Alloy agent tails). The mode is read from <code>LOG_TRANSPORT</code> env var at startup, but can be <strong>switched at runtime</strong> via <code>setTransport()</code> without restart.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">📦</div>
+      <h4>Batch Buffer</h4>
+      <p><code>_lokiBuffer[]</code> collects entries in memory. Flushed when it hits 10 entries OR every 2 seconds. <code>splice(0)</code> atomically empties the array and returns the batch — no race conditions. Reduces HTTP calls from ~60/min to ~6/min.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">💍</div>
+      <h4>Ring Buffer (Recent Logs)</h4>
+      <p><code>_recentLogs[]</code> keeps the last 200 entries. When full, <code>shift()</code> drops the oldest. The admin dashboard reads this via <code>getRecentLogs(50)</code> — no Loki or file reads needed. It's an in-memory circular window.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔄</div>
+      <h4>The Singleton Pattern</h4>
+      <p><code>module.exports = new Logger()</code> exports an <strong>instance</strong>, not the class. Node.js caches modules, so every <code>require('./logger')</code> gets the same object. One config, one buffer, one timer. The constructor runs exactly once — at first import.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">⏱️</div>
+      <h4>Timer .unref()</h4>
+      <p>The 2-second flush timer uses <code>setInterval().unref()</code>. Without <code>.unref()</code>, Node.js stays alive forever waiting for the timer. With it, if the app has nothing else to do, the process can exit gracefully — the timer won't hold it hostage.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔑</div>
+      <h4>HTTP Basic Auth for Loki</h4>
+      <p>Credentials are <code>Buffer.from(user+':'+token).toString('base64')</code>. This is NOT encryption — it's just encoding. HTTPS encrypts the transport layer. Basic Auth is the simplest HTTP auth scheme and is what Grafana Cloud expects.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🕐</div>
+      <h4>Nanosecond Timestamps</h4>
+      <p>Loki expects timestamp strings in nanoseconds. JavaScript gives milliseconds. We append <code>"000000"</code>: <code>1712345678123</code> → <code>"1712345678123000000"</code>. The string format is important — Loki parses it as a 19-digit number.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🛡️</div>
+      <h4>Silent Failure Design</h4>
+      <p>All Loki errors are caught and ignored: <code>.catch(() => {})</code>. If Loki is down, the app continues normally. Logs are already on stdout captured by pm2. This follows the principle: <strong>"logging must never break the application."</strong></p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🗂️</div>
+      <h4>Structured JSON Entries</h4>
+      <p>Every entry is <code>{ timestamp, app, version, level, message, meta? }</code>. The <code>meta</code> field is optional — only added when passed. This structure makes logs parseable by Loki <code>| json</code>, greppable by scripts, and human-readable in terminals.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔌</div>
+      <h4>Graceful Shutdown (destroy)</h4>
+      <p><code>destroy()</code> stops the timer and flushes the remaining buffer. Call it on <code>process.on('SIGTERM')</code>. Without it, logs buffered in the last 2 seconds are lost on shutdown. pm2 sends SIGINT/SIGTERM before killing.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🌐</div>
+      <h4>Dynamic Protocol (http/https)</h4>
+      <p>The logger auto-detects <code>https:</code> vs <code>http:</code> from the LOKI_URL and picks the right Node.js module. Grafana Cloud always uses HTTPS, but local Loki testing may use HTTP. The URL constructor handles port detection too.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 4. CODE EXPLAINED — FULL FILE ═══════════ -->
+<section id="code-explained" class="reveal">
+  <h2>📖 Code Explained — Full logger.js Walkthrough</h2>
+  <p>Click any line to highlight it. Every method explained in detail.</p>
+
+  <h3>Module Constants (Lines 1–5)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">1</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> https = require(<span style="color:var(--green)">'https'</span>);</span>
+      <span class="explainer-desc">Node.js built-in HTTPS module. Used for pushing logs to Grafana Cloud Loki (always HTTPS in production).</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">2</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> http = require(<span style="color:var(--green)">'http'</span>);</span>
+      <span class="explainer-desc">HTTP fallback for local Loki instances during development. The logger auto-detects the protocol from LOKI_URL.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">3</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> LEVELS = { <span style="color:var(--purple)">debug</span>: 0, <span style="color:var(--purple)">info</span>: 1, <span style="color:var(--purple)">warn</span>: 2, <span style="color:var(--purple)">error</span>: 3 };</span>
+      <span class="explainer-desc">Maps level names to numbers. Higher number = higher severity. <code>if (LEVELS[level] < this.level) return;</code> skips low-priority logs in one comparison.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">4</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> TRANSPORTS = [<span style="color:var(--green)">'local'</span>, <span style="color:var(--green)">'direct'</span>, <span style="color:var(--green)">'alloy'</span>];</span>
+      <span class="explainer-desc">Whitelist of valid modes. Used for validation: <code>if (!TRANSPORTS.includes(mode))</code>. Invalid modes fall back to 'local'.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">5</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> APP_NAME = process.env.<span style="color:var(--green)">APP_NAME</span> || require(<span style="color:var(--green)">'../package.json'</span>).name;</span>
+      <span class="explainer-desc">Env var first (for per-deployment names like "pipelinemaster"), then package.json fallback. Evaluated once at module load.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">6</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> APP_VERSION = require(<span style="color:var(--green)">'../public/version.json'</span>).version;</span>
+      <span class="explainer-desc">Reads version from version.json (updated by <code>npm run bump</code>). Appears in every log entry and Loki label. Filter by release in Grafana.</span>
+    </div>
+  </div>
+
+  <h3>Constructor — Initialization (Lines 7–18)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">7</span>
+      <span class="explainer-code"><span style="color:var(--pink)">constructor</span>(options = {}) {</span>
+      <span class="explainer-desc">Accepts an optional config object. In practice, env vars are used. The options are for testing: <code>new Logger({ level: 'debug', transport: 'local' })</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">8</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>.level = LEVELS[level] !== undefined ? LEVELS[level] : LEVELS.info;</span>
+      <span class="explainer-desc">If the level string is invalid (e.g., "verbose"), default to "info" (1). The ternary prevents <code>undefined</code> from breaking comparisons.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">9</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">if</span> (!TRANSPORTS.includes(<span style="color:var(--pink)">this</span>.transport)) <span style="color:var(--pink)">this</span>.transport = <span style="color:var(--green)">'local'</span>;</span>
+      <span class="explainer-desc">Invalid transport? Fall back to 'local' (safest mode — no network calls). Never crash on bad config.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">10</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>.lokiUrl = options.lokiUrl || process.env.<span style="color:var(--green)">LOKI_URL</span> || <span style="color:var(--green)">''</span>;</span>
+      <span class="explainer-desc">Grafana Cloud push URL. Empty string is falsy — used for "not configured" checks: <code>if (!this.lokiUrl)</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">11</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>._lokiBuffer = []; <span style="color:var(--muted)">// batch: 10 max or every 2s</span></span>
+      <span class="explainer-desc">Array that collects log entries before pushing. <code>splice(0)</code> in _flushLoki() atomically empties it.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">12</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>._lokiMaxBatch = 10; <span style="color:var(--pink)">this</span>._lokiFlushMs = 2000;</span>
+      <span class="explainer-desc">Tuning knobs. 10 entries max per batch, 2-second timer. Trade-off: higher batch = fewer HTTP calls but more latency.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">13</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>.transport === <span style="color:var(--green)">'direct'</span> && <span style="color:var(--pink)">this</span>.lokiUrl) { <span style="color:var(--pink)">this</span>._startFlushTimer(); }</span>
+      <span class="explainer-desc">Only start the timer if transport=direct AND Loki URL is set. No URL = no timer = no wasted resources.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">14</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>._recentLogs = []; <span style="color:var(--pink)">this</span>._maxRecentLogs = 200;</span>
+      <span class="explainer-desc">Ring buffer for the admin dashboard. Keeps last 200 entries in memory. No disk I/O, no Loki query needed for recent logs.</span>
+    </div>
+  </div>
+
+  <h3>Public API — The 4 Log Methods (Lines 15–18)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">15</span>
+      <span class="explainer-code"><span style="color:var(--green)">debug</span>(message, meta) { <span style="color:var(--pink)">this</span>._log(<span style="color:var(--green)">'debug'</span>, message, meta); }</span>
+      <span class="explainer-desc">Forwards to _log with level='debug'. Filtered out when LOG_LEVEL is 'info' or higher (default). Use for verbose tracing.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">16</span>
+      <span class="explainer-code"><span style="color:var(--green)">info</span>(message, meta)  { <span style="color:var(--pink)">this</span>._log(<span style="color:var(--green)">'info'</span>, message, meta); }</span>
+      <span class="explainer-desc">Standard operational messages: "Server started", "Item created", "Health check OK". The default visible level.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">17</span>
+      <span class="explainer-code"><span style="color:var(--orange)">warn</span>(message, meta)  { <span style="color:var(--pink)">this</span>._log(<span style="color:var(--green)">'warn'</span>, message, meta); }</span>
+      <span class="explainer-desc">Something unexpected but not broken: slow responses (>1s), invalid IDs, oversized input. Investigate in Grafana.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">18</span>
+      <span class="explainer-code"><span style="color:var(--red)">error</span>(message, meta) { <span style="color:var(--pink)">this</span>._log(<span style="color:var(--green)">'error'</span>, message, meta); }</span>
+      <span class="explainer-desc">Something broke: unhandled exceptions, malformed JSON, 500 errors. Goes to <strong>stderr</strong>. Alert-worthy in production.</span>
+    </div>
+  </div>
+
+  <h3>_log() — The Heart of the Logger (Lines 19–26)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">19</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (LEVELS[level] < <span style="color:var(--pink)">this</span>.level) <span style="color:var(--pink)">return</span>;</span>
+      <span class="explainer-desc"><strong>The level gate.</strong> If incoming level (e.g., debug=0) is below threshold (e.g., info=1), exit immediately. No entry built, no I/O, no buffer — zero cost for filtered logs.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">20</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> entry = { timestamp, app, version, level, message };</span>
+      <span class="explainer-desc">Build the structured log object. Timestamp is ISO 8601. APP_NAME and APP_VERSION from module constants.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">21</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (meta !== undefined) entry.meta = meta;</span>
+      <span class="explainer-desc">Meta is optional context: <code>{ id: 4, name: "Widget" }</code>. Only added when provided. Keeps entries clean when there's nothing extra to say.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">22</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._recentLogs.push(entry);</span>
+      <span class="explainer-desc">Add entry to the ring buffer (for admin dashboard). Always happens, regardless of transport mode.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">23</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>._recentLogs.length > <span style="color:var(--pink)">this</span>._maxRecentLogs) <span style="color:var(--pink)">this</span>._recentLogs.shift();</span>
+      <span class="explainer-desc">If buffer exceeds 200, drop the oldest entry. <code>shift()</code> removes from the front. This is the "ring" in ring buffer.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">24</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._write(level, entry);</span>
+      <span class="explainer-desc">Hand off to _write() which handles stdout/stderr routing and optional Loki buffer injection.</span>
+    </div>
+  </div>
+
+  <h3>_write() — Output Routing (Lines 25–30)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">25</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> line = JSON.stringify(entry);</span>
+      <span class="explainer-desc">Serialize to one-line JSON. Every log entry is a single line — crucial for pm2/Alloy log file tailing.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">26</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (level === <span style="color:var(--green)">'error'</span>) process.stderr.write(line + <span style="color:var(--green)">'\n'</span>);</span>
+      <span class="explainer-desc">Errors go to stderr (fd 2). pm2 captures to <code>*-error.log</code>. Shell redirection: <code>2>error.log</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">27</span>
+      <span class="explainer-code"><span style="color:var(--pink)">else</span> process.stdout.write(line + <span style="color:var(--green)">'\n'</span>);</span>
+      <span class="explainer-desc">Everything else (debug/info/warn) goes to stdout (fd 1). pm2 captures to <code>*-out.log</code>.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">28</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>.transport === <span style="color:var(--green)">'direct'</span> && <span style="color:var(--pink)">this</span>.lokiUrl) {</span>
+      <span class="explainer-desc">Only buffer for Loki when in direct mode AND URL is configured. Local/alloy modes skip this entirely.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">29</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">this</span>._lokiBuffer.push(entry);</span>
+      <span class="explainer-desc">Add the entry object (not the JSON string) to the buffer. It gets re-serialized in _pushToLoki() with nanosecond timestamps.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">30</span>
+      <span class="explainer-code">  <span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>._lokiBuffer.length >= <span style="color:var(--pink)">this</span>._lokiMaxBatch) <span style="color:var(--pink)">this</span>._flushLoki();</span>
+      <span class="explainer-desc">If buffer hits 10, flush immediately — don't wait for the timer. Prevents unbounded memory growth during burst logging.</span>
+    </div>
+  </div>
+
+  <h3>Loki Push — The Network Layer (Lines 31–42)</h3>
+  <div class="explainer">
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">31</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._lokiFlushInterval = setInterval(() => <span style="color:var(--pink)">this</span>._flushLoki(), 2000);</span>
+      <span class="explainer-desc">The 2-second timer. Even if the buffer has only 1 or 2 entries, they'll be sent within 2 seconds. Maximum latency guarantee.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">32</span>
+      <span class="explainer-code"><span style="color:var(--pink)">if</span> (<span style="color:var(--pink)">this</span>._lokiFlushInterval.unref) <span style="color:var(--pink)">this</span>._lokiFlushInterval.unref();</span>
+      <span class="explainer-desc"><code>.unref()</code> tells Node.js: "don't keep the process alive for this timer." Without it, <code>node src/server.js</code> would hang forever after Ctrl+C.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">33</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> batch = <span style="color:var(--pink)">this</span>._lokiBuffer.splice(0);</span>
+      <span class="explainer-desc"><code>splice(0)</code> removes ALL elements and returns them. The buffer is now empty. Atomic: no entry is lost or duplicated between the read and the clear.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">34</span>
+      <span class="explainer-code"><span style="color:var(--pink)">this</span>._pushToLoki(batch).<span style="color:var(--green)">catch</span>(() => {}); <span style="color:var(--muted)">// silently drop</span></span>
+      <span class="explainer-desc">Fire and forget. If the push fails, the batch is gone. Logs are already on stdout. Empty catch prevents unhandled rejection crash.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">35</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> ns = <span style="color:var(--pink)">new</span> Date(e.timestamp).getTime() + <span style="color:var(--green)">'000000'</span>;</span>
+      <span class="explainer-desc">Milliseconds → nanosecond string. <code>1712345678123</code> + <code>"000000"</code> = <code>"1712345678123000000"</code>. String concatenation, not math.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">36</span>
+      <span class="explainer-code"><span style="color:var(--purple)">streams</span>: [{ <span style="color:var(--purple)">stream</span>: { app, version, environment }, <span style="color:var(--purple)">values</span> }]</span>
+      <span class="explainer-desc">Loki push format: one stream with labels, containing an array of [ns_timestamp, json_line] values. Multiple entries per push.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">37</span>
+      <span class="explainer-code"><span style="color:var(--green)">'Authorization'</span>: <span style="color:var(--green)">'Basic '</span> + Buffer.from(user + <span style="color:var(--green)">':'</span> + token).toString(<span style="color:var(--green)">'base64'</span>)</span>
+      <span class="explainer-desc">HTTP Basic Auth header. <code>1540346:glc_eyJv...</code> → base64. Not encrypted — HTTPS provides the encryption layer.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">38</span>
+      <span class="explainer-code"><span style="color:var(--purple)">timeout</span>: 5000,</span>
+      <span class="explainer-desc">5-second timeout on the HTTP request. If Loki doesn't respond, the request is destroyed and resolved with an error message.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">39</span>
+      <span class="explainer-code"><span style="color:var(--pink)">const</span> ok = res.statusCode >= 200 && res.statusCode < 300;</span>
+      <span class="explainer-desc">Any 2xx is success. Loki returns 204 normally. Resolve the promise with { ok, status, message }.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">40</span>
+      <span class="explainer-code">req.on(<span style="color:var(--green)">'error'</span>, (err) => resolve({ ok: false, ... }));</span>
+      <span class="explainer-desc">Network errors (DNS failure, connection refused) resolve (not reject) with ok=false. No unhandled promise rejections.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">41</span>
+      <span class="explainer-code">req.on(<span style="color:var(--green)">'timeout'</span>, () => { req.destroy(); resolve(...); });</span>
+      <span class="explainer-desc">After 5 seconds, destroy the socket and resolve. Without <code>req.destroy()</code>, the connection hangs open wasting resources.</span>
+    </div>
+    <div class="explainer-line" onclick="highlightLine(this)">
+      <span class="line-num">42</span>
+      <span class="explainer-code"><span style="color:var(--purple)">destroy</span>() { <span style="color:var(--pink)">this</span>._stopFlushTimer(); <span style="color:var(--pink)">this</span>._flushLoki(); }</span>
+      <span class="explainer-desc">Graceful shutdown: stop the timer (no more scheduled flushes), then flush whatever's in the buffer right now. Call on SIGTERM.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 5. FLASH CARDS ═══════════ -->
+<section id="flashcards" class="reveal">
+  <h2>🃏 Flash Cards — Click to Flip</h2>
+  <p>35 cards covering every method, pattern, and design decision in logger.js.</p>
+  <div class="flashcard-container" id="flashcard-wrapper"></div>
+  <div class="anim-controls" style="margin-top:24px;">
+    <button class="anim-btn secondary" onclick="shuffleCards()">🔀 Shuffle Cards</button>
+  </div>
+</section>
+
+<!-- ═══════════ 6. INLINE QUIZ ═══════════ -->
+<section id="quiz" class="reveal">
+  <h2>📝 Quick Quiz — 20 Questions</h2>
+  <p>Test your understanding of logger.js internals. Answers are revealed after you pick.</p>
+  <div id="quiz-container"></div>
+  <div class="quiz-score" id="quiz-score">
+    <h3>Quiz Complete!</h3>
+    <div class="big" id="quiz-score-big"></div>
+    <p id="quiz-score-detail" style="color:var(--muted);margin-top:8px;"></p>
+    <button class="anim-btn" style="margin-top:16px;" onclick="resetQuiz()">↺ Retake Quiz</button>
+  </div>
+</section>
+
+<!-- ═══════════ NAV BACK ═══════════ -->
+<section class="reveal" style="text-align:center; padding:48px 0;">
+  <h2>Back to Lecture 03</h2>
+  <p style="margin:16px 0 24px; color:var(--muted);">Continue with the main lecture content, debugging stories, and the full 60-question quiz.</p>
+  <a href="index.html" class="anim-btn" style="display:inline-block; text-decoration:none; font-size:1.1em; padding:12px 36px;">← Lecture 03 Main</a>
+  <a href="quiz.html" class="anim-btn secondary" style="display:inline-block; text-decoration:none; font-size:1.1em; padding:12px 36px; margin-left:12px;">📝 Full Quiz (60 Questions) →</a>
+</section>
+
+</div>
+
+<script>
+// ═══════════ ANIMATION ENGINE (reusable) ═══════════
+function createFlowAnim(prefix, stepIds, messages) {
+  var idx = 0, timer = null, paused = false;
+  function getEl(id) { return document.getElementById(id); }
+  function play() {
+    if (paused) { resume(); return; }
+    reset(); paused = false;
+    getEl(prefix+'-play').textContent = '▶ Play';
+    getEl(prefix+'-pause').disabled = false;
+    advance();
+  }
+  function advance() {
+    if (idx >= stepIds.length) { getEl(prefix+'-pause').disabled = true; return; }
+    var el = getEl(stepIds[idx]);
+    el.classList.add('active');
+    getEl(prefix+'-status').textContent = messages[idx];
+    timer = setTimeout(function() {
+      el.classList.remove('active'); el.classList.add('done'); idx++;
+      if (idx < stepIds.length && !paused) timer = setTimeout(advance, 400);
+      else if (idx >= stepIds.length) {
+        getEl(prefix+'-status').innerHTML = '<span style="color:var(--green)">✅ Complete!</span>';
+        getEl(prefix+'-pause').disabled = true;
+      }
+    }, 2200);
+  }
+  function pause() {
+    paused = true; clearTimeout(timer);
+    getEl(prefix+'-play').textContent = '▶ Resume';
+    getEl(prefix+'-pause').disabled = true;
+    var c = getEl(stepIds[idx]); if (c) { c.classList.remove('active'); c.classList.add('paused'); }
+  }
+  function resume() {
+    paused = false;
+    getEl(prefix+'-play').textContent = '▶ Play';
+    getEl(prefix+'-pause').disabled = false;
+    var c = getEl(stepIds[idx]); if (c) { c.classList.remove('paused'); c.classList.add('active'); }
+    timer = setTimeout(function() {
+      var el = getEl(stepIds[idx]); if (el) { el.classList.remove('active'); el.classList.add('done'); }
+      idx++;
+      if (idx < stepIds.length) timer = setTimeout(advance, 400);
+      else { getEl(prefix+'-status').innerHTML = '<span style="color:var(--green)">✅ Complete!</span>'; getEl(prefix+'-pause').disabled = true; }
+    }, 1500);
+  }
+  function step() {
+    clearTimeout(timer); paused = true;
+    getEl(prefix+'-play').textContent = '▶ Resume';
+    getEl(prefix+'-pause').disabled = true;
+    if (idx > 0) { var prev = getEl(stepIds[idx-1]); if (prev) { prev.classList.remove('active','paused'); prev.classList.add('done'); } }
+    if (idx >= stepIds.length) { getEl(prefix+'-status').innerHTML = '<span style="color:var(--green)">✅ Complete!</span>'; return; }
+    stepIds.forEach(function(id) { getEl(id).classList.remove('active','paused'); });
+    var el = getEl(stepIds[idx]); el.classList.add('paused');
+    getEl(prefix+'-status').textContent = messages[idx];
+    idx++;
+  }
+  function reset() {
+    clearTimeout(timer); idx = 0; paused = false;
+    stepIds.forEach(function(id) { getEl(id).classList.remove('active','done','paused'); });
+    getEl(prefix+'-status').textContent = 'Click ▶ Play to start';
+    getEl(prefix+'-play').textContent = '▶ Play';
+    getEl(prefix+'-pause').disabled = false;
+  }
+  return { play: play, pause: pause, step: step, reset: reset };
+}
+
+// Flow 1: log.info() path
+var f1 = createFlowAnim('flow1',
+  ['f1-call','f1-log','f1-ring','f1-write','f1-buffer'],
+  [
+    'Your code calls log.info("Item created", { id: 4 }).\nThe info() method is a thin wrapper — it immediately calls this._log("info", message, meta).',
+    '_log() first checks the level gate: LEVELS["info"]=1 >= this.level(1)? YES → proceed.\nIt builds a structured entry: { timestamp, app, version, level:"info", message, meta: {id:4} }.',
+    'The entry is pushed into _recentLogs[]. If length > 200, shift() drops the oldest.\nThis ring buffer powers the admin dashboard\'s live log view — no Loki needed.',
+    '_write() serializes the entry to JSON and writes to stdout (since level != "error").\nprocess.stdout.write(json + "\\n") — one entry = one line. Critical for log file tailing.',
+    'Since transport="direct" and lokiUrl is set, the entry is also pushed to _lokiBuffer[].\nIf buffer.length >= 10, _flushLoki() fires immediately. Otherwise, the 2s timer will flush it.'
+  ]
+);
+function flow1Play(){f1.play();} function flow1Pause(){f1.pause();} function flow1Step(){f1.step();} function flow1Reset(){f1.reset();}
+
+// Flow 2: Buffer flush path
+var f2 = createFlowAnim('flow2',
+  ['f2-timer','f2-flush','f2-push','f2-loki','f2-grafana'],
+  [
+    'The 2-second setInterval fires (or buffer hit 10 entries).\nThe timer was created with .unref() so it won\'t prevent Node.js from exiting.',
+    '_flushLoki() checks if buffer is empty (skip if so).\nsplice(0) atomically removes all entries and returns them as a batch array. The buffer is now empty for new entries.',
+    '_pushToLoki(batch) converts each entry to [nanosecond_timestamp, json_line] pairs.\nBuilds the Loki payload: { streams: [{ stream: {app,version,env}, values: [...] }] }.\nSends HTTP POST with Basic Auth header.',
+    'Grafana Cloud Loki receives the push.\nIt indexes the stream labels (app, version, environment) — NOT the log text.\nReturns 204 No Content on success. 403 if wrong token scope.',
+    '✅ Logs are now in Grafana Cloud!\nQuery with {app="pipeline"} | json | level="error" to find errors.\nBuild dashboards, set alerts, share with your team.'
+  ]
+);
+function flow2Play(){f2.play();} function flow2Pause(){f2.pause();} function flow2Step(){f2.step();} function flow2Reset(){f2.reset();}
+
+// ═══════════ LINE HIGHLIGHTER ═══════════
+function highlightLine(el) {
+  document.querySelectorAll('.explainer-line').forEach(function(l) { l.classList.remove('highlight'); });
+  el.classList.add('highlight');
+}
+
+// ═══════════ FLASH CARDS ═══════════
+var flashcardData = [
+  { q: 'What pattern does module.exports = new Logger() implement?', a: 'The Singleton pattern. Node.js caches modules, so every require("./logger") returns the same instance. One config, one buffer, one timer.' },
+  { q: 'What are the 4 log levels in order?', a: 'debug (0) < info (1) < warn (2) < error (3). Higher number = higher severity. The numeric mapping enables single-comparison filtering.' },
+  { q: 'How does the level gate work?', a: 'if (LEVELS[level] < this.level) return; — if the incoming log\'s priority number is below the threshold, it\'s silently dropped. Zero cost.' },
+  { q: 'What are the 3 transport modes?', a: 'local (stdout only), direct (stdout + HTTP push to Loki), alloy (stdout for Grafana Alloy agent to tail log files).' },
+  { q: 'What does splice(0) do in _flushLoki()?', a: 'Removes ALL elements from the array and returns them. Atomically empties the buffer — no entries lost between read and clear.' },
+  { q: 'Why use .unref() on the flush timer?', a: 'Without .unref(), Node.js keeps running forever waiting for the interval. With it, the timer won\'t prevent graceful process exit.' },
+  { q: 'Where do error-level logs go?', a: 'process.stderr (file descriptor 2). All other levels go to process.stdout (fd 1). pm2 captures them to separate log files.' },
+  { q: 'What is the ring buffer used for?', a: '_recentLogs[] keeps the last 200 entries in memory. When full, shift() drops the oldest. The admin dashboard reads this via getRecentLogs().' },
+  { q: 'How does the logger convert timestamps for Loki?', a: 'JS milliseconds + "000000" = nanosecond string. 1712345678123 → "1712345678123000000". String concatenation, not math.' },
+  { q: 'What HTTP auth does the Loki push use?', a: 'HTTP Basic Auth: "Basic " + Buffer.from(user + ":" + token).toString("base64"). Not encryption — HTTPS encrypts the transport.' },
+  { q: 'What does Loki return on success?', a: '204 No Content. The logger checks for any 2xx: statusCode >= 200 && statusCode < 300.' },
+  { q: 'What happens if _pushToLoki() fails?', a: 'The error is silently caught (.catch(() => {})). Logs are already on stdout. The app never crashes because of logging failures.' },
+  { q: 'When does the buffer flush?', a: 'Two triggers: buffer hits 10 entries (immediate flush), OR every 2 seconds (timer flush). Whichever comes first.' },
+  { q: 'Why does the constructor check this.lokiUrl before starting the timer?', a: 'No point running a timer if there\'s no Loki URL configured. Saves resources in local/alloy mode or misconfigured setups.' },
+  { q: 'What does setTransport() do with the timer?', a: 'Switching FROM direct → stops the timer. Switching TO direct → starts the timer. Manages the lifecycle cleanly.' },
+  { q: 'Where does APP_NAME come from?', a: 'process.env.APP_NAME (first priority) || package.json name (fallback). Env var lets different deployments use different names.' },
+  { q: 'Where does APP_VERSION come from?', a: 'require("../public/version.json").version — updated by npm run bump. Appears in every log entry and as a Loki stream label.' },
+  { q: 'Why are APP_NAME and APP_VERSION defined outside the class?', a: 'They\'re constants that never change. Defined at module load, accessible to the class without re-reading files on every log call.' },
+  { q: 'What is the Loki push payload format?', a: '{ streams: [{ stream: { labels }, values: [[ "ns_timestamp", "json_line" ]] }] }. One stream per push with all batched entries.' },
+  { q: 'What 3 labels are sent as Loki stream labels?', a: 'app (APP_NAME), version (APP_VERSION), and environment (NODE_ENV || "development"). Loki indexes these for fast querying.' },
+  { q: 'How does the logger detect http vs https?', a: 'Parses the LOKI_URL with new URL(), checks parsedUrl.protocol === "https:". Uses the matching Node.js module.' },
+  { q: 'What does the 5000ms timeout on the HTTP request do?', a: 'If Loki doesn\'t respond in 5 seconds, req.destroy() kills the socket and the promise resolves with ok:false.' },
+  { q: 'Why does _pushToLoki use resolve() instead of reject()?', a: 'resolve({ ok: false, ... }) means callers can always check .ok without try/catch. Simpler error handling — no unhandled rejections.' },
+  { q: 'What does testLokiConnection() do?', a: 'Pushes a single test entry to Loki and returns { ok, status, message }. Used by the admin dashboard\'s "Test Connection" button.' },
+  { q: 'What happens if LOKI_URL is invalid?', a: 'new URL() throws → caught by try/catch → resolves { ok: false, message: "Invalid LOKI_URL" }. No crash.' },
+  { q: 'What does destroy() do?', a: 'Stops the flush timer (_stopFlushTimer) and flushes remaining buffer (_flushLoki). Call on SIGTERM for graceful shutdown.' },
+  { q: 'Why use process.stdout.write() instead of console.log()?', a: 'console.log adds a newline and goes through Node\'s internal formatting. process.stdout.write is raw — we control the exact output format.' },
+  { q: 'What happens if transport is set to an invalid value?', a: 'if (!TRANSPORTS.includes(this.transport)) this.transport = "local" — falls back to the safest mode silently.' },
+  { q: 'How does the logger handle burst logging?', a: 'If buffer hits 10 entries before the 2s timer, _flushLoki() fires immediately. Prevents unbounded memory growth during bursts.' },
+  { q: 'Can you switch transport mode without restarting?', a: 'Yes! setTransport("direct") changes mode instantly. Auto-manages the flush timer lifecycle.' },
+  { q: 'Why is meta only added when !== undefined?', a: 'Keeps log entries clean. log.info("Server started") has no meta field. log.info("Item", {id:4}) adds meta:{id:4}.' },
+  { q: 'What does getRecentLogs(count) return?', a: 'The last N entries from _recentLogs via .slice(-(count||50)). Default is last 50 entries.' },
+  { q: 'Why export an instance instead of the class?', a: 'Guarantees a single shared instance — same config, buffer, and timer everywhere. No chance of accidentally creating a second logger.' },
+  { q: 'What is path building logic in _pushToLoki?', a: 'Checks if LOKI_URL already contains /loki/api/v1/push. If not, appends it. Strips trailing slashes first.' },
+  { q: 'What is the default log level?', a: 'info (1). Set via LOG_LEVEL env var. debug shows everything, error shows only errors. Invalid values default to info.' },
+];
+
+function renderCards() {
+  var w = document.getElementById('flashcard-wrapper');
+  w.innerHTML = flashcardData.map(function(c, i) {
+    return '<div class="flashcard" onclick="this.classList.toggle(\'flipped\')"><div class="flashcard-inner"><div class="flashcard-front"><div class="q-label">Card '+(i+1)+'</div><p>'+c.q+'</p><div class="flashcard-hint" style="color:var(--muted);font-size:.75em;margin-top:12px;">Click to flip</div></div><div class="flashcard-back"><div class="a-label">Answer</div><p>'+c.a+'</p></div></div></div>';
+  }).join('');
+}
+function shuffleCards() {
+  for (var i = flashcardData.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = flashcardData[i]; flashcardData[i] = flashcardData[j]; flashcardData[j] = t; }
+  renderCards();
+}
+renderCards();
+
+// ═══════════ INLINE QUIZ ═══════════
+var quizData = [
+  { q: 'What does module.exports = new Logger() create?', opts: ['A class export', 'A singleton instance', 'A factory function', 'A prototype chain'], ans: 1, exp: 'It exports an instance, not the class. Node.js module caching ensures only one instance exists across the whole app.' },
+  { q: 'What numeric value does LEVELS.warn have?', opts: ['0', '1', '2', '3'], ans: 2, exp: 'debug=0, info=1, warn=2, error=3. Higher number = higher severity.' },
+  { q: 'What triggers an immediate buffer flush (not waiting for the timer)?', opts: ['Every log call', 'Buffer reaches 10 entries', 'Buffer reaches 100 entries', 'Only on shutdown'], ans: 1, exp: 'When _lokiBuffer.length >= _lokiMaxBatch (10), _flushLoki() fires immediately.' },
+  { q: 'What does .unref() on the flush timer prevent?', opts: ['Memory leaks', 'The process from exiting', 'The timer keeping Node.js alive', 'Duplicate timers'], ans: 2, exp: '.unref() tells Node: don\'t keep the process running just for this timer. Without it, the server can\'t exit cleanly.' },
+  { q: 'Which output stream receives error-level logs?', opts: ['stdout', 'stderr', 'Both', 'Neither'], ans: 1, exp: 'process.stderr.write() for errors. Everything else goes to process.stdout.write().' },
+  { q: 'What is the maximum size of the ring buffer (_recentLogs)?', opts: ['50', '100', '200', '1000'], ans: 2, exp: '_maxRecentLogs = 200. When exceeded, shift() drops the oldest entry.' },
+  { q: 'How are millisecond timestamps converted to nanoseconds for Loki?', opts: ['Multiply by 1000000', 'Append "000000" as string', 'Use BigInt', 'Loki handles conversion'], ans: 1, exp: 'String concatenation: getTime() + "000000". Simple and avoids floating-point issues with large numbers.' },
+  { q: 'What HTTP status code does Loki return on successful push?', opts: ['200 OK', '201 Created', '204 No Content', '202 Accepted'], ans: 2, exp: 'Loki returns 204 No Content. The logger checks for any 2xx (>= 200 && < 300).' },
+  { q: 'What does splice(0) do to _lokiBuffer?', opts: ['Returns first element', 'Empties the array and returns all elements', 'Removes last element', 'Copies the array'], ans: 1, exp: 'splice(0) removes ALL elements from the array and returns them. The buffer is now empty.' },
+  { q: 'Why does _pushToLoki use resolve() instead of reject() for errors?', opts: ['JavaScript limitation', 'Callers check .ok instead of try/catch — simpler', 'Reject is slower', 'It\'s a bug'], ans: 1, exp: 'Always resolving with { ok: true/false } means callers never need try/catch. Cleaner API, no unhandled rejections.' },
+  { q: 'What happens if you call log.debug() with LOG_LEVEL=info?', opts: ['Writes to stdout at reduced priority', 'Silently returns — nothing happens', 'Throws an error', 'Writes to stderr'], ans: 1, exp: 'LEVELS.debug (0) < this.level (1), so _log() returns immediately. No entry built, no I/O.' },
+  { q: 'Where does APP_NAME get its value?', opts: ['Always from package.json', 'process.env.APP_NAME first, then package.json', 'From the hostname', 'User must provide it'], ans: 1, exp: 'process.env.APP_NAME || require("../package.json").name. Env var takes priority for per-deployment naming.' },
+  { q: 'What is the fallback transport mode for invalid values?', opts: ['direct', 'alloy', 'local', 'none'], ans: 2, exp: 'if (!TRANSPORTS.includes(this.transport)) this.transport = "local". Safest mode — no network calls.' },
+  { q: 'What 3 stream labels are sent to Loki?', opts: ['level, message, timestamp', 'app, version, environment', 'host, port, pid', 'name, type, source'], ans: 1, exp: 'Stream labels: app (APP_NAME), version (APP_VERSION), environment (NODE_ENV). Used for fast Loki filtering.' },
+  { q: 'What does the destroy() method do?', opts: ['Deletes log files', 'Stops timer and flushes remaining buffer', 'Clears recent logs only', 'Kills the Node process'], ans: 1, exp: 'destroy() calls _stopFlushTimer() then _flushLoki(). Ensures buffered logs are sent before shutdown.' },
+  { q: 'What happens if LOKI_URL is an invalid URL string?', opts: ['App crashes', 'new URL() throws → caught → resolves ok:false', 'Falls back to http://localhost', 'Silent retry'], ans: 1, exp: 'The try/catch around new URL() catches the error and resolves with { ok: false, message: "Invalid LOKI_URL" }.' },
+  { q: 'Why use process.stdout.write() instead of console.log()?', opts: ['console.log is deprecated', 'Direct control over output format (no extra newlines/formatting)', 'console.log is slower', 'console.log doesn\'t work in production'], ans: 1, exp: 'process.stdout.write gives raw output. console.log adds formatting and goes through Node\'s internal console layer.' },
+  { q: 'What does testLokiConnection() push?', opts: ['A health check request', 'A single test log entry with message "Loki connection test"', 'An empty payload', 'All recent logs'], ans: 1, exp: 'Creates one entry with level "info" and message "Loki connection test from pipeline admin", then calls _pushToLoki([entry]).' },
+  { q: 'How does setTransport() manage the flush timer?', opts: ['Always restarts it', 'Stops when leaving direct, starts when entering direct', 'Never touches it', 'Destroys and recreates the Logger'], ans: 1, exp: 'Switching FROM direct → _stopFlushTimer(). Switching TO direct → _startFlushTimer(). Clean lifecycle management.' },
+  { q: 'When is the meta field added to a log entry?', opts: ['Always', 'Only for error level', 'Only when meta !== undefined', 'Only in direct mode'], ans: 2, exp: 'if (meta !== undefined) entry.meta = meta; — keeps entries clean when no extra context is needed.' },
+];
+
+var quizAnswered = 0, quizCorrect = 0;
+var quizState = new Array(quizData.length).fill(-1);
+var letters = ['A','B','C','D'];
+
+function renderQuiz() {
+  var c = document.getElementById('quiz-container');
+  c.innerHTML = quizData.map(function(q, qi) {
+    var st = quizState[qi];
+    return '<div class="quiz-section" id="qz-'+qi+'">' +
+      '<div class="quiz-q">#'+(qi+1)+'. '+q.q+'</div>' +
+      '<div class="quiz-opts">' + q.opts.map(function(o, oi) {
+        var cls = 'quiz-opt';
+        if (st >= 0) { cls += ' disabled'; if (oi === q.ans) cls += ' correct'; else if (oi === st && st !== q.ans) cls += ' wrong'; }
+        return '<div class="'+cls+'" onclick="answerQuiz('+qi+','+oi+')"><span class="opt-letter">'+letters[oi]+'</span><span>'+o+'</span></div>';
+      }).join('') + '</div>' +
+      '<div class="quiz-exp'+(st >= 0 ? ' show' : '')+'" id="qzexp-'+qi+'">'+q.exp+'</div>' +
+    '</div>';
+  }).join('');
+}
+
+function answerQuiz(qi, oi) {
+  if (quizState[qi] >= 0) return;
+  quizState[qi] = oi;
+  quizAnswered++;
+  if (oi === quizData[qi].ans) quizCorrect++;
+  renderQuiz();
+  if (quizAnswered === quizData.length) finishQuiz();
+}
+
+function finishQuiz() {
+  var pct = Math.round(quizCorrect / quizData.length * 100);
+  var el = document.getElementById('quiz-score');
+  var big = document.getElementById('quiz-score-big');
+  big.textContent = pct + '%';
+  big.className = 'big ' + (pct >= 80 ? 'great' : pct >= 50 ? 'mid' : 'low');
+  document.getElementById('quiz-score-detail').textContent = quizCorrect + ' correct out of ' + quizData.length;
+  el.classList.add('show');
+}
+
+function resetQuiz() {
+  quizAnswered = 0; quizCorrect = 0; quizState.fill(-1);
+  document.getElementById('quiz-score').classList.remove('show');
+  renderQuiz();
+  document.getElementById('quiz-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+renderQuiz();
+
+// ═══════════ SCROLL REVEAL ═══════════
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) { if (entry.isIntersecting) entry.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
+
+// ═══════════ QUESTION SYSTEM ═══════════
+(function(){
+  var LID='lecture03-bonus-logger',SKEY='user-questions-'+LID;
+  function getQs(){return JSON.parse(localStorage.getItem(SKEY)||'{}');}
+  function saveQ(id,t){var qs=getQs();if(!qs[id])qs[id]=[];qs[id].push({text:t,ts:new Date().toISOString()});localStorage.setItem(SKEY,JSON.stringify(qs));}
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function textId(t){return t.substring(0,40).replace(/[^a-z0-9]/gi,'').toLowerCase();}
+  function showInput(el,id){
+    var ex=el.querySelector('.q-input-box');if(ex){ex.remove();return;}
+    document.querySelectorAll('.q-input-box').forEach(function(b){b.remove();});
+    var box=document.createElement('div');box.className='q-input-box';
+    box.innerHTML='<textarea placeholder="Type your question about this..." rows="2"></textarea><div class="q-input-actions"><button class="q-save-btn">💾 Save</button><button class="q-cancel-btn">✕ Cancel</button></div>';
+    box.addEventListener('click',function(e){e.stopPropagation();});
+    box.querySelector('.q-save-btn').addEventListener('click',function(e){
+      e.stopPropagation();var t=box.querySelector('textarea').value.trim();
+      if(t){saveQ(id,t);box.remove();renderSaved(el,id);updateBtn(el,id);}
+    });
+    box.querySelector('.q-cancel-btn').addEventListener('click',function(e){e.stopPropagation();box.remove();});
+    el.appendChild(box);box.querySelector('textarea').focus();
+  }
+  function renderSaved(el,id){
+    var old=el.querySelector('.q-saved-list');if(old)old.remove();
+    var qs=getQs()[id];if(!qs||!qs.length)return;
+    var list=document.createElement('div');list.className='q-saved-list';
+    list.innerHTML=qs.map(function(q){return '<div class="q-saved-item"><span>💬</span><span class="q-saved-text">'+esc(q.text)+'</span></div>';}).join('');
+    list.addEventListener('click',function(e){e.stopPropagation();});
+    el.appendChild(list);
+  }
+  function updateBtn(el,id){
+    var btn=el.querySelector('.q-ask-btn'),qs=getQs()[id];
+    if(btn&&qs&&qs.length)btn.classList.add('has-questions');
+  }
+  function addBtn(el,id){
+    if(el.querySelector('.q-ask-btn'))return;
+    el.style.position='relative';
+    var btn=document.createElement('button');btn.className='q-ask-btn';btn.textContent='?';btn.title='Ask a question about this';
+    btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();showInput(el,id);});
+    el.appendChild(btn);renderSaved(el,id);updateBtn(el,id);
+  }
+  function inject(){
+    document.querySelectorAll('.concept-card').forEach(function(el,i){addBtn(el,'concept-'+i);});
+    document.querySelectorAll('.explainer-line').forEach(function(el,i){addBtn(el,'explain-'+i);});
+    document.querySelectorAll('.flashcard').forEach(function(el){
+      var t=el.querySelector('.flashcard-front p');
+      addBtn(el,'flash-'+textId(t?t.textContent:''));
+    });
+    document.querySelectorAll('.quiz-section').forEach(function(el,i){addBtn(el,'quiz-'+i);});
+    document.querySelectorAll('.table-block').forEach(function(el,i){addBtn(el,'table-'+i);});
+    document.querySelectorAll('.pipeline-viz').forEach(function(el,i){addBtn(el,'pipeline-'+i);});
+  }
+  var dt;var mo=new MutationObserver(function(){clearTimeout(dt);dt=setTimeout(inject,150);});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',function(){mo.observe(document.body,{childList:true,subtree:true});});
+  setTimeout(inject,50);
+})();
+</script>
+
+</body>
+</html>
