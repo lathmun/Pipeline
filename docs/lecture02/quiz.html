@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 02 Quiz — Environment Variables, Logging &amp; Monitoring</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; line-height:1.7; }
+
+  /* NAV */
+  nav { position:sticky; top:0; z-index:100; background:var(--surface); border-bottom:1px solid var(--border); padding:12px 24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  nav a { color:var(--accent); text-decoration:none; font-size:14px; padding:4px 12px; border-radius:6px; transition:background .2s; }
+  nav a:hover { background:rgba(88,166,255,.15); }
+  nav .title { font-weight:700; color:var(--text); font-size:16px; margin-right:auto; }
+
+  .container { max-width:900px; margin:0 auto; padding:32px 24px; }
+
+  /* PROGRESS BAR */
+  .progress-bar { position:sticky; top:52px; z-index:90; background:var(--surface); border-bottom:1px solid var(--border); padding:12px 24px; }
+  .progress-track { background:var(--bg); border-radius:8px; height:12px; overflow:hidden; }
+  .progress-fill { background:linear-gradient(90deg,var(--accent),var(--purple)); height:100%; border-radius:8px; width:0; transition:width .4s; }
+  .progress-text { text-align:center; font-size:13px; color:var(--muted); margin-top:6px; }
+
+  h1 { font-size:2em; margin-bottom:8px; background:linear-gradient(135deg,var(--accent),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .subtitle { color:var(--muted); font-size:1.1em; margin-bottom:24px; }
+
+  /* FILTER BAR */
+  .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:32px; }
+  .filter-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:6px 14px; border-radius:20px; cursor:pointer; font-size:13px; transition:all .2s; }
+  .filter-btn:hover { border-color:var(--accent); }
+  .filter-btn.active { background:var(--accent); color:#0d1117; border-color:var(--accent); font-weight:600; }
+  .filter-count { font-size:11px; color:var(--muted); margin-left:4px; }
+
+  /* QUESTION CARD */
+  .question-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; transition:border-color .3s; }
+  .question-card.correct { border-color:var(--green); }
+  .question-card.wrong { border-color:var(--red); }
+  .question-card .q-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .question-card .q-num { color:var(--muted); font-size:.85em; }
+  .question-card .q-cat { background:rgba(88,166,255,.12); color:var(--accent); font-size:.7em; padding:3px 10px; border-radius:12px; font-weight:600; }
+  .question-card .q-text { font-size:1.05em; font-weight:500; margin-bottom:16px; }
+
+  /* OPTIONS */
+  .option { display:flex; align-items:flex-start; gap:12px; padding:10px 14px; margin:6px 0; border-radius:8px; cursor:pointer; border:1px solid transparent; transition:all .2s; }
+  .option:hover:not(.disabled) { background:rgba(88,166,255,.06); border-color:var(--border); }
+  .option.selected { border-color:var(--accent); background:rgba(88,166,255,.08); }
+  .option.chosen-correct { border-color:var(--green); background:rgba(63,185,80,.1); }
+  .option.chosen-wrong { border-color:var(--red); background:rgba(248,81,73,.1); }
+  .option.show-correct { border-color:var(--green); background:rgba(63,185,80,.06); }
+  .option.disabled { cursor:default; opacity:.8; }
+  .option .letter { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; border:2px solid var(--border); font-weight:700; font-size:.85em; flex-shrink:0; transition:all .2s; }
+  .option.chosen-correct .letter { border-color:var(--green); color:var(--green); }
+  .option.chosen-wrong .letter { border-color:var(--red); color:var(--red); }
+  .option.show-correct .letter { border-color:var(--green); color:var(--green); }
+
+  /* EXPLANATION */
+  .explanation { background:var(--bg); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:12px 16px; margin-top:16px; display:none; color:var(--muted); font-size:.9em; line-height:1.7; }
+  .explanation.visible { display:block; }
+  .explanation code { background:var(--surface); padding:2px 6px; border-radius:4px; color:var(--accent); font-size:.9em; }
+
+  /* RESULTS */
+  #results { display:none; background:var(--surface); border:2px solid var(--border); border-radius:16px; padding:32px; margin-top:32px; text-align:center; }
+  #results h2 { font-size:1.8em; margin-bottom:8px; }
+  #results .score { font-size:3em; font-weight:800; margin:16px 0; }
+  #results .score.great { color:var(--green); }
+  #results .score.ok { color:var(--orange); }
+  #results .score.low { color:var(--red); }
+  .result-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:24px 0; text-align:left; }
+  .result-card { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .result-card .label { color:var(--muted); font-size:.85em; }
+  .result-card .value { font-size:1.3em; font-weight:700; margin-top:4px; }
+
+  .btn { padding:10px 28px; border:none; border-radius:8px; cursor:pointer; font-size:15px; font-weight:600; transition:background .2s; }
+  .btn-primary { background:var(--accent); color:#0d1117; }
+  .btn-primary:hover { background:#79c0ff; }
+  .btn-secondary { background:transparent; border:1px solid var(--border); color:var(--text); margin-left:12px; }
+  .btn-secondary:hover { border-color:var(--accent); }
+
+  @media(max-width:600px){
+    .container{padding:16px 12px;}
+    .question-card{padding:16px;}
+    .option{padding:8px 10px;}
+  }
+
+  /* QUESTION SYSTEM */
+  .q-ask-btn { position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--orange); background:var(--surface); color:var(--orange); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:10; transition:all .2s; opacity:.7; line-height:1; padding:0; font-family:inherit; }
+  .q-ask-btn:hover { opacity:1; border-color:var(--orange); background:rgba(210,153,34,.2); transform:scale(1.15); }
+  .q-ask-btn.has-questions { opacity:1; background:rgba(210,153,34,.18); border-color:var(--orange); }
+  .q-input-box { background:var(--bg); border:1px solid var(--orange); border-radius:8px; padding:12px; margin-top:12px; position:relative; z-index:20; }
+  .q-input-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:inherit; font-size:14px; resize:vertical; min-height:60px; }
+  .q-input-box textarea:focus { outline:none; border-color:var(--orange); }
+  .q-input-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .q-input-actions button { padding:5px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; border:none; }
+  .q-input-actions .q-save-btn { background:var(--orange); color:#0d1117; }
+  .q-input-actions .q-save-btn:hover { background:#e5ac30; }
+  .q-input-actions .q-cancel-btn { background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .q-input-actions .q-cancel-btn:hover { border-color:var(--orange) !important; }
+  .q-saved-list { margin-top:8px; }
+  .q-saved-item { display:flex; gap:8px; align-items:flex-start; padding:5px 10px; background:rgba(210,153,34,.06); border-left:2px solid var(--orange); border-radius:0 6px 6px 0; margin:4px 0; font-size:.82em; }
+  .q-saved-item span:first-child { flex-shrink:0; }
+  .q-saved-text { color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📝 Lecture 02 Quiz</span>
+  <a href="index.html">← Back to Lecture</a>
+  <a href="../lecture01/quiz.html">Lecture 01 Quiz</a>
+</nav>
+
+<div class="progress-bar">
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="progress-text" id="progress-text">0 / 60 answered</div>
+</div>
+
+<div class="container">
+  <h1>Quiz — Env Vars, Logging &amp; Monitoring</h1>
+  <p class="subtitle">60 questions. Pick the best answer, read the explanation, and learn!</p>
+
+  <div class="filter-bar" id="filter-bar"></div>
+  <div id="questions"></div>
+
+  <div style="text-align:center;margin:32px 0;">
+    <button class="btn btn-primary" onclick="finishQuiz()">Finish &amp; Show Results</button>
+  </div>
+
+  <div id="results">
+    <h2>Your Results</h2>
+    <div class="score" id="score-display"></div>
+    <div class="result-grid" id="result-grid"></div>
+    <div style="margin-top:24px;">
+      <button class="btn btn-primary" onclick="resetQuiz()">🔄 Try Again</button>
+      <button class="btn btn-secondary" onclick="showWrong()">Show Wrong Only</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const questions = [
+  // ═══════ CATEGORY 1: Env Vars & dotenv (10) ═══════
+  { cat:'Env Vars & dotenv', q:'How do you read an environment variable in Node.js?', opts:['process.env.NAME','env.get("NAME")','os.env("NAME")','require("env").NAME'], ans:0, exp:'Node.js exposes all environment variables on the <code>process.env</code> object. Access any variable with <code>process.env.VARIABLE_NAME</code>.' },
+  { cat:'Env Vars & dotenv', q:'What does the dotenv package do?', opts:['Encrypts .env files','Reads .env file into process.env','Creates .env files automatically','Deploys .env to the server'], ans:1, exp:'<code>dotenv</code> reads key=value pairs from a <code>.env</code> file and sets them on <code>process.env</code>. Only needed locally — production uses system env vars.' },
+  { cat:'Env Vars & dotenv', q:'Which line loads dotenv in our app?', opts:['import dotenv','require("dotenv").config()','dotenv.load()','process.loadEnv()'], ans:1, exp:'<code>require("dotenv").config()</code> reads the .env file from the project root and populates process.env.' },
+  { cat:'Env Vars & dotenv', q:'Should .env be committed to Git?', opts:['Yes, for the team','Only on private repos','Never — it contains secrets','Only on the main branch'], ans:2, exp:'The .env file contains real credentials. It must be in <code>.gitignore</code> and never committed. Use .env.example as a safe template.' },
+  { cat:'Env Vars & dotenv', q:'What is .env.example for?', opts:['Backup of real secrets','Template showing required vars with placeholder values','Automatically creates .env','Testing credentials file'], ans:1, exp:'<code>.env.example</code> shows developers which variables are needed, with safe placeholder values like <code>AUTH_PASS=your_password_here</code>. Safe to commit.' },
+  { cat:'Env Vars & dotenv', q:'What does AUTH_PASS=changeme indicate?', opts:['A secure default password','A fallback signaling "replace me"','A randomly generated password','An encrypted credential'], ans:1, exp:'The fallback "changeme" is intentionally obvious — it signals that the real value must be set via environment variables in production.' },
+  { cat:'Env Vars & dotenv', q:'What happens if process.env.PORT is not set and the code uses PORT || 5000?', opts:['The app crashes','Port defaults to 5000','Port defaults to 80','An error is thrown'], ans:1, exp:'The <code>||</code> operator provides a fallback. If PORT is undefined, the expression evaluates to 5000.' },
+  { cat:'Env Vars & dotenv', q:'Where should dotenv.config() be called?', opts:['After route definitions','In the test files only','At the very start of the app, before anything reads process.env','In the deploy workflow'], ans:2, exp:'<code>require("dotenv").config()</code> must run before any code accesses <code>process.env</code> values, typically at the top of app.js.' },
+  { cat:'Env Vars & dotenv', q:'Which of these is NOT a common use for environment variables?', opts:['Port numbers','Database passwords','CSS styles','API keys'], ans:2, exp:'CSS styles belong in stylesheets. Environment variables store configuration and secrets that change between environments.' },
+  { cat:'Env Vars & dotenv', q:'Why use environment variables instead of hardcoding credentials?', opts:['It runs faster','Different values for dev/staging/production without code changes','It reduces file size','It makes the app more colorful'], ans:1, exp:'Env vars separate config from code. The same codebase runs in dev (with test creds) and production (with real creds) without any code change.' },
+
+  // ═══════ CATEGORY 2: GitHub Secrets & Production Config (10) ═══════
+  { cat:'GitHub Secrets & Config', q:'Where are GitHub Secrets stored?', opts:['In the .env file','In the workflow YAML','In repo Settings → Secrets','In package.json'], ans:2, exp:'GitHub Secrets are configured in your repository\'s Settings → Secrets and variables → Actions. They are encrypted at rest.' },
+  { cat:'GitHub Secrets & Config', q:'How do you reference a secret in a GitHub Actions workflow?', opts:['$SECRET_NAME','process.env.SECRET','${{ secrets.SECRET_NAME }}','#{secrets.SECRET_NAME}'], ans:2, exp:'The syntax <code>${{ secrets.NAME }}</code> tells GitHub Actions to inject the decrypted secret value at runtime.' },
+  { cat:'GitHub Secrets & Config', q:'Are GitHub Secrets visible in workflow logs?', opts:['Yes, always','No, they are masked (best-effort)','Only to admins','Only during deployment'], ans:1, exp:'GitHub masks secret values in logs, but it\'s best-effort — partial values or encoded forms might still appear. Never echo secrets.' },
+  { cat:'GitHub Secrets & Config', q:'Why is .env excluded from rsync deployment?', opts:['It\'s too large','Server doesn\'t support .env','Secrets come from GitHub Secrets via ecosystem.config.js','dotenv doesn\'t work on servers'], ans:2, exp:'Production credentials are injected through the deploy workflow: GitHub Secrets → ecosystem.config.js → pm2 → process.env. The .env file stays local.' },
+  { cat:'GitHub Secrets & Config', q:'What file passes env vars to pm2 on the server?', opts:['.env','Dockerfile','ecosystem.config.js','nginx.conf'], ans:2, exp:'<code>ecosystem.config.js</code> has an <code>env:</code> block where the deploy workflow writes the secrets. pm2 reads this file and starts the app with those env vars.' },
+  { cat:'GitHub Secrets & Config', q:'Who can view GitHub Secrets?', opts:['Anyone with read access','Only repo admins','Anyone who forks the repo','All GitHub users'], ans:1, exp:'Only repository administrators can view and manage secrets. Collaborators can use them in workflows but cannot see the actual values.' },
+  { cat:'GitHub Secrets & Config', q:'Which secrets does our deploy workflow use?', opts:['Only AUTH_PASS','DB_HOST and DB_PASS','TEST_SERVER_HOST, SSH_KEY, AUTH_USER, AUTH_PASS','AWS_ACCESS_KEY'], ans:2, exp:'Our workflow uses server connection secrets (host, user, SSH key) and app secrets (AUTH_USER, AUTH_PASS) — all stored as GitHub Secrets.' },
+  { cat:'GitHub Secrets & Config', q:'What is the flow of secrets to production?', opts:['Code → Server → App','GitHub Secrets → Workflow → ecosystem.config.js → pm2 → process.env','.env → Git → Server → App','Manual server SSH → export commands'], ans:1, exp:'Secrets flow: encrypted in GitHub → injected by Actions runner → written to ecosystem.config.js → read by pm2 → available in process.env.' },
+  { cat:'GitHub Secrets & Config', q:'Can GitHub Actions secrets be used in pull requests from forks?', opts:['Yes, always','No, for security reasons','Only if the fork owner enables it','Only on public repos'], ans:1, exp:'Secrets are NOT passed to workflows triggered by PRs from forks. This prevents malicious forks from stealing your secrets.' },
+  { cat:'GitHub Secrets & Config', q:'Which is safer: hardcoded password in code or GitHub Secrets?', opts:['Hardcoded — it\'s always available','GitHub Secrets — encrypted, masked, access-controlled','Both are equally safe','Neither is safe'], ans:1, exp:'GitHub Secrets are encrypted at rest, masked in logs, and only visible to admins. Hardcoded passwords are in plain text for anyone with code access.' },
+
+  // ═══════ CATEGORY 3: Logger Class & Log Levels (10) ═══════
+  { cat:'Logger & Log Levels', q:'What are the 4 log levels in order (most to least verbose)?', opts:['error, warn, info, debug','debug, info, warn, error','info, debug, error, warn','warn, error, debug, info'], ans:1, exp:'<code>debug (0) < info (1) < warn (2) < error (3)</code>. Debug is the most verbose, error is the most restrictive.' },
+  { cat:'Logger & Log Levels', q:'What is the default log level in our logger?', opts:['debug','info','warn','error'], ans:1, exp:'Default is <code>info</code>. This shows info, warn, and error messages but hides debug messages. Set <code>LOG_LEVEL=debug</code> to see everything.' },
+  { cat:'Logger & Log Levels', q:'If LOG_LEVEL=warn, which messages are printed?', opts:['Only warn','warn and error','debug, info, warn, and error','None'], ans:1, exp:'LOG_LEVEL sets the minimum. At "warn" level, only warn (2) and error (3) messages are printed. Info (1) and debug (0) are suppressed.' },
+  { cat:'Logger & Log Levels', q:'What does the Logger\'s _write() method do?', opts:['Validates the log level','Outputs JSON to stdout or stderr','Reads from a log file','Sends logs to GitHub'], ans:1, exp:'<code>_write()</code> is the single output method. It writes JSON to stdout (for info/debug/warn) or stderr (for error). Change only this method to switch log destinations.' },
+  { cat:'Logger & Log Levels', q:'Why is our logger a singleton?', opts:['It\'s faster','Every file gets the same instance with consistent config','Singletons are required by Node.js','It saves memory'], ans:1, exp:'<code>module.exports = new Logger()</code> creates one instance. Every require() gets the SAME object — same log level, same output format everywhere.' },
+  { cat:'Logger & Log Levels', q:'How does the logger read its configuration?', opts:['From a config.json file','From process.env.LOG_LEVEL','From command line arguments','From the database'], ans:1, exp:'The Logger constructor reads <code>process.env.LOG_LEVEL</code> and maps it to a numeric threshold. This lets you change verbosity without editing code.' },
+  { cat:'Logger & Log Levels', q:'Where does log.error() write to?', opts:['stdout','stderr','A file called error.log','The database'], ans:1, exp:'Error-level messages write to <code>process.stderr</code>. This separates error output from normal output, allowing different handling by the OS or pm2.' },
+  { cat:'Logger & Log Levels', q:'What does the LEVELS object map?', opts:['Log files to directories','Level names to numeric values','Users to permissions','Routes to handlers'], ans:1, exp:'<code>LEVELS = { debug: 0, info: 1, warn: 2, error: 3 }</code>. The numeric values are compared against the threshold to decide whether to print a message.' },
+  { cat:'Logger & Log Levels', q:'How would you enable debug logging in production?', opts:['Edit logger.js on the server','Set LOG_LEVEL=debug in ecosystem.config.js and restart pm2','Add console.log statements','It cannot be changed in production'], ans:1, exp:'Change the <code>LOG_LEVEL</code> value in ecosystem.config.js and run <code>pm2 restart</code>. The logger reads the new value on startup — no code changes needed.' },
+  { cat:'Logger & Log Levels', q:'What happens when log.debug("test") is called with LOG_LEVEL=info?', opts:['It prints "test"','It throws an error','Nothing — the message is silently skipped','It prints to stderr'], ans:2, exp:'Debug (0) is below info (1). The <code>_log()</code> method checks <code>if (LEVELS[level] < this.level) return;</code> and skips the message entirely.' },
+
+  // ═══════ CATEGORY 4: Structured Logging & Security (10) ═══════
+  { cat:'Structured Logging & Security', q:'What format does our logger output?', opts:['Plain text','XML','JSON','CSV'], ans:2, exp:'Each log entry is a JSON object: <code>{"timestamp":"...","app":"pipeline","level":"info","message":"..."}</code>. Machine-readable and easy to parse.' },
+  { cat:'Structured Logging & Security', q:'Which fields are in every log entry?', opts:['timestamp, level, message','timestamp, app, level, message','app, message, stack','user, level, message'], ans:1, exp:'Every entry includes <code>timestamp</code> (ISO), <code>app</code> (from package.json), <code>level</code>, and <code>message</code>. Optional <code>meta</code> is added when provided.' },
+  { cat:'Structured Logging & Security', q:'Where does the "app" field come from?', opts:['A hardcoded string','process.env.APP_NAME','The "name" field in package.json','The hostname of the server'], ans:2, exp:'<code>const APP_NAME = require("../package.json").name</code>. It reads the project name automatically — in our case, "pipeline".' },
+  { cat:'Structured Logging & Security', q:'Why include the app name in every log entry?', opts:['It looks professional','Multiple apps may share the same pm2 instance — filter logs by app name','It\'s required by JSON spec','To match the git repo name'], ans:1, exp:'With pm2 running multiple apps, <code>pm2 logs</code> shows them all mixed together. The app field lets you filter: "show me only pipeline logs."' },
+  { cat:'Structured Logging & Security', q:'Why was the username removed from auth failure logs?', opts:['To save disk space','Users sometimes type passwords in the username field','The username was too long','It\'s a GDPR requirement'], ans:1, exp:'If a user accidentally types their password in the username field, logging that value exposes the password in plain text. We now only log the URL.' },
+  { cat:'Structured Logging & Security', q:'What should you NEVER include in log messages?', opts:['Timestamps','Request URLs','Passwords or secret values','HTTP methods'], ans:2, exp:'Passwords, tokens, API keys, and other secrets must never appear in logs. Anyone with log access could read them. Log only metadata like URLs and error codes.' },
+  { cat:'Structured Logging & Security', q:'What is the "meta" field in a log entry?', opts:['Always required metadata','Optional extra data like request URL or item ID','The log level number','The file that called the logger'], ans:1, exp:'<code>meta</code> is an optional object added when you provide extra context: <code>log.info("Item created", { id: 1, name: "test" })</code>.' },
+  { cat:'Structured Logging & Security', q:'Why use JSON instead of plain text like "User logged in at 3pm"?', opts:['JSON is smaller','JSON can be parsed, indexed, searched, and queried by tools like Kibana','JSON is the only format Node.js supports','JSON is more human-readable'], ans:1, exp:'Structured JSON lets log management tools automatically parse fields, create dashboards, set up alerts, and search across millions of entries.' },
+  { cat:'Structured Logging & Security', q:'How would you switch our logger to send logs to Kibana?', opts:['Rewrite all log.info() calls in every file','Change only the _write() method in logger.js','Install Kibana as an npm package','It\'s not possible without rewriting the whole app'], ans:1, exp:'The Central Logger pattern means only <code>_write()</code> knows where logs go. Change it to send HTTP requests to Elasticsearch/Kibana — the rest of the app is untouched.' },
+  { cat:'Structured Logging & Security', q:'Which auth failure detail IS safe to log?', opts:['The attempted password','The attempted username','The request URL','The Authorization header value'], ans:2, exp:'URLs are safe — they don\'t contain credentials (auth is in headers, not URL). The password and username could contain sensitive data and must not be logged.' },
+
+  // ═══════ CATEGORY 5: Error Handling & API Responses (10) ═══════
+  { cat:'Error Handling & Responses', q:'What fields are in a structured error response?', opts:['error and message','status and body','code and text','type and description'], ans:0, exp:'Our API returns <code>{ error: "AUTH_INVALID", message: "Incorrect username or password." }</code>. The error field is a machine-readable code, message is human-readable.' },
+  { cat:'Error Handling & Responses', q:'What is the purpose of the error code (e.g., AUTH_INVALID)?', opts:['Shown to users','Used by frontend code to decide what to do','Sent to GitHub','Logged only'], ans:1, exp:'The error code is for the frontend to programmatically handle different error types — e.g., redirect to login for AUTH_MISSING, show message for AUTH_INVALID.' },
+  { cat:'Error Handling & Responses', q:'What HTTP status code means "not authenticated"?', opts:['400','401','403','404'], ans:1, exp:'<code>401 Unauthorized</code> means the client didn\'t provide valid credentials. 403 means authenticated but not authorized. 404 is not found.' },
+  { cat:'Error Handling & Responses', q:'What error code does our API return when no credentials are sent?', opts:['AUTH_INVALID','NOT_FOUND','AUTH_MISSING','VALIDATION_ERROR'], ans:2, exp:'<code>AUTH_MISSING</code> is returned with a 401 status when the request has no Authorization header at all.' },
+  { cat:'Error Handling & Responses', q:'What error code is returned for wrong username/password?', opts:['AUTH_MISSING','AUTH_INVALID','LOGIN_FAILED','CREDENTIALS_WRONG'], ans:1, exp:'<code>AUTH_INVALID</code> is returned with 401 when credentials are provided but don\'t match. Different from AUTH_MISSING (no credentials at all).' },
+  { cat:'Error Handling & Responses', q:'What status code is returned when an item is not found?', opts:['400','401','403','404'], ans:3, exp:'<code>404 Not Found</code> with error code NOT_FOUND. The message tells the user which item ID was not found.' },
+  { cat:'Error Handling & Responses', q:'When is VALIDATION_ERROR returned?', opts:['Wrong password','Missing item ID','POST request with missing required "name" field','Server crash'], ans:2, exp:'<code>VALIDATION_ERROR</code> is returned with 400 when input validation fails — e.g., creating an item without providing a name.' },
+  { cat:'Error Handling & Responses', q:'How does the frontend display API error messages?', opts:['It ignores them','It reads the "message" field from the JSON response','It parses the HTTP status code text','It shows a generic "Something went wrong"'], ans:1, exp:'The frontend makes a fetch() call, reads the response JSON, and displays the <code>message</code> field to the user — e.g., below the login form.' },
+  { cat:'Error Handling & Responses', q:'Why return both a code AND a human-readable message?', opts:['The code is for machines (frontend logic), the message is for humans (display in UI)','They\'re the same thing','The code is a backup in case message fails','It\'s a REST API requirement'], ans:0, exp:'Separation of concerns: the frontend uses the code to decide WHAT to do, and shows the message so the user knows WHAT happened.' },
+  { cat:'Error Handling & Responses', q:'What changed in the frontend after adding structured errors?', opts:['Nothing — it already showed errors','It now reads error.message from the API instead of hardcoding "Invalid credentials"','It redirects to an error page','It shows a popup alert'], ans:1, exp:'Before: generic hardcoded text. After: the frontend reads the actual <code>message</code> field from the API response, so different errors show different messages.' },
+
+  // ═══════ CATEGORY 6: Health Checks & Coverage (10) ═══════
+  { cat:'Health Checks & Coverage', q:'What does GET /health return?', opts:['Just "OK"','{ status: "ok", uptime: seconds, timestamp: ISO }','The full app config','An HTML page'], ans:1, exp:'The health endpoint returns a JSON object with status, uptime (from process.uptime()), and current timestamp. Simple and informative.' },
+  { cat:'Health Checks & Coverage', q:'Why does /health not require authentication?', opts:['It was a mistake','Monitoring tools and load balancers need open access','Health data isn\'t sensitive','Express doesn\'t support auth on health routes'], ans:1, exp:'Monitoring tools, Nginx, and uptime checkers continuously hit /health. They don\'t have credentials and shouldn\'t need them to check if the app is alive.' },
+  { cat:'Health Checks & Coverage', q:'What is process.uptime()?', opts:['Current Unix timestamp','Seconds since the Node.js process started','Server CPU usage','Network latency'], ans:1, exp:'<code>process.uptime()</code> returns the number of seconds the current Node.js process has been running. Useful for detecting unexpected restarts.' },
+  { cat:'Health Checks & Coverage', q:'What is code coverage?', opts:['How many files are in the project','Percentage of code executed during tests','Number of tests that pass','Lines of documentation'], ans:1, exp:'Code coverage measures what fraction of your code is actually run when tests execute. Higher = more code tested = more confidence.' },
+  { cat:'Health Checks & Coverage', q:'What does "89% statement coverage" mean?', opts:['89% of tests pass','89% of code lines were executed during testing','89% of functions are tested','89% of branches were tested'], ans:1, exp:'Statement coverage measures the percentage of individual code statements (roughly lines) that were executed at least once by the test suite.' },
+  { cat:'Health Checks & Coverage', q:'What is branch coverage?', opts:['Coverage of git branches','Percentage of if/else paths tested','Coverage of function calls','Coverage of imports'], ans:1, exp:'Branch coverage measures whether both sides of every if/else, ternary, and switch statement have been tested. Catches hidden bugs in untested paths.' },
+  { cat:'Health Checks & Coverage', q:'Can you have 100% statement coverage but miss bugs?', opts:['No, 100% means no bugs','Yes, untested branches can hide bugs','Only if tests are wrong','Only in dynamic languages'], ans:1, exp:'If only the "if" side runs during tests, statement coverage counts those lines. But the "else" side — potentially buggy — is never tested.' },
+  { cat:'Health Checks & Coverage', q:'What command generates our coverage report?', opts:['jest --verbose','npm run test:coverage','npm run coverage','node coverage.js'], ans:1, exp:'<code>npm run test:coverage</code> runs Jest with --coverage, then our custom script generates a single HTML report file.' },
+  { cat:'Health Checks & Coverage', q:'Where is the coverage report uploaded in CI/CD?', opts:['To npm registry','As a GitHub Actions artifact','To the production server','To a CDN'], ans:1, exp:'The workflow uses <code>actions/upload-artifact</code> to save the coverage HTML as a downloadable artifact on each workflow run.' },
+  { cat:'Health Checks & Coverage', q:'Why did we build a custom coverage report script?', opts:['Jest doesn\'t support coverage','Jest generates many files — we wanted a single self-contained HTML','To make coverage reports smaller','Jest\'s reports are in XML only'], ans:1, exp:'Jest\'s built-in HTML reporter creates a folder with many CSS/JS files. Our custom <code>scripts/coverage-report.js</code> generates one single HTML file — cleaner to upload as an artifact.' },
+];
+
+// ═══════ QUIZ ENGINE ═══════
+let answered = {};
+const cats = [...new Set(questions.map(q => q.cat))];
+let activeFilter = 'All';
+
+function renderFilters() {
+  const bar = document.getElementById('filter-bar');
+  const counts = {};
+  cats.forEach(c => counts[c] = questions.filter(q => q.cat === c).length);
+  bar.innerHTML = `<button class="filter-btn active" onclick="filterBy('All')">All <span class="filter-count">${questions.length}</span></button>` +
+    cats.map(c => `<button class="filter-btn" onclick="filterBy('${c}')">${c} <span class="filter-count">${counts[c]}</span></button>`).join('');
+}
+
+function filterBy(cat) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.closest('.filter-btn').classList.add('active');
+  renderQuestions();
+}
+
+function renderQuestions() {
+  const container = document.getElementById('questions');
+  const filtered = activeFilter === 'All' ? questions : questions.filter(q => q.cat === activeFilter);
+  container.innerHTML = filtered.map((q, fi) => {
+    const gi = questions.indexOf(q);
+    const a = answered[gi];
+    const letters = ['A','B','C','D'];
+    return `<div class="question-card${a !== undefined ? (a === q.ans ? ' correct' : ' wrong') : ''}" id="qcard-${gi}">
+      <div class="q-header">
+        <span class="q-num">#${gi + 1}</span>
+        <span class="q-cat">${q.cat}</span>
+      </div>
+      <div class="q-text">${q.q}</div>
+      ${q.opts.map((opt, oi) => {
+        let cls = 'option';
+        if (a !== undefined) {
+          cls += ' disabled';
+          if (oi === a && a === q.ans) cls += ' chosen-correct';
+          else if (oi === a && a !== q.ans) cls += ' chosen-wrong';
+          else if (oi === q.ans) cls += ' show-correct';
+        }
+        return `<div class="${cls}" onclick="answer(${gi},${oi})">
+          <span class="letter">${letters[oi]}</span>
+          <span>${opt}</span>
+        </div>`;
+      }).join('')}
+      <div class="explanation${a !== undefined ? ' visible' : ''}" id="exp-${gi}">${q.exp}</div>
+    </div>`;
+  }).join('');
+}
+
+function answer(qi, oi) {
+  if (answered[qi] !== undefined) return;
+  answered[qi] = oi;
+  renderQuestions();
+  updateProgress();
+}
+
+function updateProgress() {
+  const count = Object.keys(answered).length;
+  const pct = (count / questions.length) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = `${count} / ${questions.length} answered`;
+}
+
+function finishQuiz() {
+  const total = questions.length;
+  const right = questions.filter((q, i) => answered[i] === q.ans).length;
+  const pct = Math.round((right / total) * 100);
+
+  const scoreEl = document.getElementById('score-display');
+  scoreEl.textContent = `${right} / ${total} (${pct}%)`;
+  scoreEl.className = 'score ' + (pct >= 80 ? 'great' : pct >= 50 ? 'ok' : 'low');
+
+  // Category breakdown
+  const grid = document.getElementById('result-grid');
+  grid.innerHTML = cats.map(cat => {
+    const catQs = questions.map((q, i) => ({ ...q, idx: i })).filter(q => q.cat === cat);
+    const catRight = catQs.filter(q => answered[q.idx] === q.ans).length;
+    return `<div class="result-card">
+      <div class="label">${cat}</div>
+      <div class="value" style="color:${catRight === catQs.length ? 'var(--green)' : catRight >= catQs.length/2 ? 'var(--orange)' : 'var(--red)'}">${catRight}/${catQs.length}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+function showWrong() {
+  activeFilter = 'All';
+  renderQuestions();
+  // Hide correct ones
+  questions.forEach((q, i) => {
+    const card = document.getElementById('qcard-' + i);
+    if (card && answered[i] === q.ans) card.style.display = 'none';
+  });
+}
+
+function resetQuiz() {
+  answered = {};
+  activeFilter = 'All';
+  document.getElementById('results').style.display = 'none';
+  renderFilters();
+  renderQuestions();
+  updateProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// INIT
+renderFilters();
+renderQuestions();
+
+// ═══════════ QUESTION SYSTEM ═══════════
+(function(){
+  var LID='lecture02-quiz',SKEY='user-questions-'+LID;
+  function getQs(){return JSON.parse(localStorage.getItem(SKEY)||'{}');}
+  function saveQ(id,t){var qs=getQs();if(!qs[id])qs[id]=[];qs[id].push({text:t,ts:new Date().toISOString()});localStorage.setItem(SKEY,JSON.stringify(qs));}
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function showInput(el,id){
+    var ex=el.querySelector('.q-input-box');if(ex){ex.remove();return;}
+    document.querySelectorAll('.q-input-box').forEach(function(b){b.remove();});
+    var box=document.createElement('div');box.className='q-input-box';
+    box.innerHTML='<textarea placeholder="Type your question about this..." rows="2"></textarea><div class="q-input-actions"><button class="q-save-btn">💾 Save</button><button class="q-cancel-btn">✕ Cancel</button></div>';
+    box.addEventListener('click',function(e){e.stopPropagation();});
+    box.querySelector('.q-save-btn').addEventListener('click',function(e){
+      e.stopPropagation();var t=box.querySelector('textarea').value.trim();
+      if(t){saveQ(id,t);box.remove();renderSaved(el,id);updateBtn(el,id);}
+    });
+    box.querySelector('.q-cancel-btn').addEventListener('click',function(e){e.stopPropagation();box.remove();});
+    el.appendChild(box);box.querySelector('textarea').focus();
+  }
+  function renderSaved(el,id){
+    var old=el.querySelector('.q-saved-list');if(old)old.remove();
+    var qs=getQs()[id];if(!qs||!qs.length)return;
+    var list=document.createElement('div');list.className='q-saved-list';
+    list.innerHTML=qs.map(function(q){return '<div class="q-saved-item"><span>💬</span><span class="q-saved-text">'+esc(q.text)+'</span></div>';}).join('');
+    list.addEventListener('click',function(e){e.stopPropagation();});
+    el.appendChild(list);
+  }
+  function updateBtn(el,id){
+    var btn=el.querySelector('.q-ask-btn'),qs=getQs()[id];
+    if(btn&&qs&&qs.length)btn.classList.add('has-questions');
+  }
+  function addBtn(el,id){
+    if(el.querySelector('.q-ask-btn'))return;
+    el.style.position='relative';
+    var btn=document.createElement('button');btn.className='q-ask-btn';btn.textContent='?';btn.title='Ask a question about this';
+    btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();showInput(el,id);});
+    el.appendChild(btn);renderSaved(el,id);updateBtn(el,id);
+  }
+  function inject(){
+    document.querySelectorAll('.question-card').forEach(function(el){
+      var idx=el.id.replace(/[^0-9]/g,'');
+      addBtn(el,'quiz-'+idx);
+    });
+  }
+  var dt;var mo=new MutationObserver(function(){clearTimeout(dt);dt=setTimeout(inject,150);});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',function(){mo.observe(document.body,{childList:true,subtree:true});});
+  setTimeout(inject,50);
+})();
+</script>
+
+</body>
+</html>

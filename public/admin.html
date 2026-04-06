@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Admin — Grafana & Logging</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #bc8cff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; line-height:1.6; }
+
+  nav { background:var(--surface); border-bottom:1px solid var(--border); padding:14px 24px; display:flex; align-items:center; gap:16px; }
+  nav .title { font-weight:700; font-size:16px; margin-right:auto; }
+  nav a { color:var(--accent); text-decoration:none; font-size:14px; }
+  nav a:hover { text-decoration:underline; }
+
+  .container { max-width:1200px; margin:0 auto; padding:24px; }
+
+  /* Status Bar */
+  .status-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+  .status-chip { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 20px; flex:1; min-width:140px; }
+  .status-chip .label { color:var(--muted); font-size:.8em; text-transform:uppercase; letter-spacing:.5px; }
+  .status-chip .value { font-size:1.6em; font-weight:700; margin-top:4px; }
+  .status-chip .value.green { color:var(--green); }
+  .status-chip .value.orange { color:var(--orange); }
+  .status-chip .value.red { color:var(--red); }
+
+  /* Panels */
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:24px; }
+  .panel h2 { color:var(--accent); font-size:1.2em; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media(max-width:768px) { .grid-2 { grid-template-columns:1fr; } }
+
+  /* Transport Controls */
+  .transport-group { display:flex; gap:8px; margin-bottom:16px; }
+  .transport-btn { padding:8px 20px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer; font-size:14px; font-weight:600; transition:all .2s; }
+  .transport-btn:hover { border-color:var(--accent); }
+  .transport-btn.active { background:var(--accent); color:#0d1117; border-color:var(--accent); }
+  .transport-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .test-result { margin-top:12px; padding:10px 14px; border-radius:8px; font-size:.9em; display:none; }
+  .test-result.success { display:block; background:rgba(63,185,80,.12); color:var(--green); border:1px solid var(--green); }
+  .test-result.fail { display:block; background:rgba(248,81,73,.12); color:var(--red); border:1px solid var(--red); }
+
+  /* Stat Table */
+  .stat-table { width:100%; border-collapse:collapse; }
+  .stat-table td { padding:8px 12px; border-bottom:1px solid var(--border); }
+  .stat-table td:first-child { color:var(--muted); width:50%; }
+  .stat-table td:last-child { font-weight:600; text-align:right; }
+
+  /* Method Badges */
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.75em; font-weight:700; margin-right:4px; }
+  .badge-get { background:rgba(63,185,80,.15); color:var(--green); }
+  .badge-post { background:rgba(88,166,255,.15); color:var(--accent); }
+  .badge-put { background:rgba(210,153,34,.15); color:var(--orange); }
+  .badge-delete { background:rgba(248,81,73,.15); color:var(--red); }
+
+  /* Log Stream */
+  .log-stream { max-height:400px; overflow-y:auto; font-family:'Fira Code',Consolas,monospace; font-size:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .log-entry { padding:3px 0; border-bottom:1px solid rgba(48,54,61,.4); display:flex; gap:12px; }
+  .log-entry:last-child { border-bottom:none; }
+  .log-ts { color:var(--muted); flex-shrink:0; min-width:80px; }
+  .log-level { flex-shrink:0; min-width:50px; font-weight:700; text-transform:uppercase; }
+  .log-level.debug { color:var(--muted); }
+  .log-level.info { color:var(--accent); }
+  .log-level.warn { color:var(--orange); }
+  .log-level.error { color:var(--red); }
+  .log-msg { color:var(--text); word-break:break-all; }
+
+  /* Action Buttons */
+  .btn { padding:8px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; border:none; transition:all .2s; }
+  .btn-primary { background:var(--accent); color:#0d1117; }
+  .btn-primary:hover { background:#79c0ff; }
+  .btn-danger { background:var(--red); color:#fff; }
+  .btn-danger:hover { background:#ff9492; }
+  .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .btn-outline:hover { border-color:var(--accent); }
+
+  .actions { display:flex; gap:8px; margin-top:12px; }
+
+  /* Route Table */
+  .route-table { width:100%; border-collapse:collapse; }
+  .route-table th { text-align:left; padding:8px 12px; color:var(--muted); font-size:.85em; border-bottom:1px solid var(--border); }
+  .route-table td { padding:6px 12px; border-bottom:1px solid rgba(48,54,61,.4); font-size:.9em; }
+  .route-table tr:hover td { background:rgba(88,166,255,.04); }
+
+  .refresh-info { color:var(--muted); font-size:.8em; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="title">📊 Pipeline Admin</span>
+  <a href="/">Home</a>
+  <a href="/health">Health</a>
+</nav>
+
+<div class="container">
+
+  <!-- Status Chips -->
+  <div class="status-bar" id="status-bar">
+    <div class="status-chip"><div class="label">Total Requests</div><div class="value" id="s-total">—</div></div>
+    <div class="status-chip"><div class="label">Uptime</div><div class="value green" id="s-uptime">—</div></div>
+    <div class="status-chip"><div class="label">Errors (4xx+5xx)</div><div class="value red" id="s-errors">—</div></div>
+    <div class="status-chip"><div class="label">Auth Failures</div><div class="value orange" id="s-auth">—</div></div>
+    <div class="status-chip"><div class="label">Avg Response</div><div class="value" id="s-avg">—</div></div>
+    <div class="status-chip"><div class="label">Req/min</div><div class="value" id="s-rpm">—</div></div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Left Column -->
+    <div>
+      <!-- Transport Panel -->
+      <div class="panel">
+        <h2>🔧 Log Transport</h2>
+        <p style="color:var(--muted);font-size:.9em;margin-bottom:12px;">Choose how logs are shipped to Grafana Loki.</p>
+        <div class="transport-group">
+          <button class="transport-btn" data-mode="local" onclick="switchTransport('local')">Local (stdout)</button>
+          <button class="transport-btn" data-mode="direct" onclick="switchTransport('direct')">Direct → Loki</button>
+          <button class="transport-btn" data-mode="alloy" onclick="switchTransport('alloy')">Alloy Agent</button>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline" onclick="testLoki()">🧪 Test Loki Connection</button>
+        </div>
+        <div class="test-result" id="test-result"></div>
+        <p style="color:var(--muted);font-size:.8em;margin-top:8px;" id="loki-status"></p>
+      </div>
+
+      <!-- Stats Table -->
+      <div class="panel">
+        <h2>📈 Request Stats</h2>
+        <table class="stat-table">
+          <tr><td>By Method</td><td id="st-methods">—</td></tr>
+          <tr><td>2xx Responses</td><td id="st-2xx">—</td></tr>
+          <tr><td>4xx Responses</td><td id="st-4xx">—</td></tr>
+          <tr><td>5xx Responses</td><td id="st-5xx">—</td></tr>
+          <tr><td>Avg Response Time</td><td id="st-avg">—</td></tr>
+          <tr><td>P95 Response Time</td><td id="st-p95">—</td></tr>
+          <tr><td>Min / Max</td><td id="st-minmax">—</td></tr>
+        </table>
+        <div class="actions">
+          <button class="btn btn-danger" onclick="resetMetrics()">↺ Reset Metrics</button>
+        </div>
+      </div>
+
+      <!-- Top Routes -->
+      <div class="panel">
+        <h2>🛤️ Top Routes</h2>
+        <table class="route-table">
+          <thead><tr><th>Route</th><th style="text-align:right">Hits</th></tr></thead>
+          <tbody id="route-body"><tr><td colspan="2" style="color:var(--muted)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div>
+      <!-- Log Stream -->
+      <div class="panel">
+        <h2>📋 Recent Logs</h2>
+        <div class="actions" style="margin-top:0;margin-bottom:12px;">
+          <button class="btn btn-outline" onclick="loadLogs()">↻ Refresh</button>
+          <select id="log-filter" onchange="loadLogs()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;">
+            <option value="">All Levels</option>
+            <option value="debug">Debug</option>
+            <option value="info">Info</option>
+            <option value="warn">Warn</option>
+            <option value="error">Error</option>
+          </select>
+        </div>
+        <div class="log-stream" id="log-stream"><div style="color:var(--muted)">Loading logs...</div></div>
+        <div class="refresh-info">Auto-refreshes every 5s</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// --- Auth header (reuse browser credentials from basic auth prompt) ---
+let AUTH = '';
+function getAuth() {
+  if (AUTH) return AUTH;
+  // The browser already sent basic auth to reach this page,
+  // so we encode the same credentials for fetch calls.
+  // We'll prompt once if needed.
+  return AUTH;
+}
+
+async function apiFetch(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  opts.headers['Content-Type'] = 'application/json';
+  const res = await fetch(url, opts);
+  if (res.status === 401) {
+    // Re-prompt for credentials
+    const user = prompt('Admin username:');
+    const pass = prompt('Admin password:');
+    if (user && pass) {
+      AUTH = 'Basic ' + btoa(user + ':' + pass);
+      opts.headers['Authorization'] = AUTH;
+      return fetch(url, opts);
+    }
+  }
+  return res;
+}
+
+// --- Load Stats ---
+async function loadStats() {
+  try {
+    const res = await apiFetch('/api/admin/stats');
+    if (!res.ok) return;
+    const d = await res.json();
+
+    document.getElementById('s-total').textContent = d.totalRequests.toLocaleString();
+    document.getElementById('s-uptime').textContent = formatUptime(d.uptime);
+    document.getElementById('s-errors').textContent = ((d.byStatus['4xx'] || 0) + (d.byStatus['5xx'] || 0)).toLocaleString();
+    document.getElementById('s-auth').textContent = d.authFailures.toLocaleString();
+    document.getElementById('s-avg').textContent = d.responseTimes.avg + 'ms';
+    document.getElementById('s-rpm').textContent = d.requestsPerMinute;
+
+    // Methods
+    const methods = Object.entries(d.byMethod).map(([m, c]) => {
+      const cls = m === 'GET' ? 'get' : m === 'POST' ? 'post' : m === 'PUT' ? 'put' : m === 'DELETE' ? 'delete' : 'get';
+      return `<span class="badge badge-${cls}">${m}</span> ${c}`;
+    }).join('&nbsp;&nbsp;');
+    document.getElementById('st-methods').innerHTML = methods || '—';
+
+    document.getElementById('st-2xx').textContent = d.byStatus['2xx'] || 0;
+    document.getElementById('st-4xx').textContent = d.byStatus['4xx'] || 0;
+    document.getElementById('st-5xx').textContent = d.byStatus['5xx'] || 0;
+    document.getElementById('st-avg').textContent = d.responseTimes.avg + ' ms';
+    document.getElementById('st-p95').textContent = d.responseTimes.p95 + ' ms';
+    document.getElementById('st-minmax').textContent = d.responseTimes.min + ' / ' + d.responseTimes.max + ' ms';
+
+    // Transport buttons
+    document.querySelectorAll('.transport-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === d.logTransport);
+    });
+
+    // Loki status
+    document.getElementById('loki-status').textContent = d.lokiConfigured
+      ? 'Loki credentials configured ✅'
+      : 'Loki credentials not set — add LOKI_URL, LOKI_USER, LOKI_TOKEN to .env';
+
+    // Routes
+    const routeBody = document.getElementById('route-body');
+    if (d.topRoutes.length) {
+      routeBody.innerHTML = d.topRoutes.map(r => `<tr><td>${r.route}</td><td style="text-align:right">${r.count}</td></tr>`).join('');
+    } else {
+      routeBody.innerHTML = '<tr><td colspan="2" style="color:var(--muted)">No requests yet</td></tr>';
+    }
+  } catch (e) {
+    console.error('Failed to load stats:', e);
+  }
+}
+
+// --- Load Logs ---
+async function loadLogs() {
+  try {
+    const res = await apiFetch('/api/admin/logs?count=100');
+    if (!res.ok) return;
+    const logs = await res.json();
+    const filter = document.getElementById('log-filter').value;
+    const filtered = filter ? logs.filter(l => l.level === filter) : logs;
+    const stream = document.getElementById('log-stream');
+
+    if (!filtered.length) {
+      stream.innerHTML = '<div style="color:var(--muted)">No logs to display</div>';
+      return;
+    }
+
+    stream.innerHTML = filtered.reverse().map(l => {
+      const ts = new Date(l.timestamp).toLocaleTimeString();
+      const meta = l.meta ? ' ' + JSON.stringify(l.meta) : '';
+      return `<div class="log-entry"><span class="log-ts">${ts}</span><span class="log-level ${l.level}">${l.level}</span><span class="log-msg">${escHtml(l.message)}${meta ? ' <span style="color:var(--muted)">' + escHtml(meta) + '</span>' : ''}</span></div>`;
+    }).join('');
+
+    stream.scrollTop = 0;
+  } catch (e) {
+    console.error('Failed to load logs:', e);
+  }
+}
+
+// --- Switch Transport ---
+async function switchTransport(mode) {
+  try {
+    const res = await apiFetch('/api/admin/transport', {
+      method: 'PUT',
+      body: JSON.stringify({ transport: mode }),
+    });
+    if (res.ok) {
+      loadStats();
+    }
+  } catch (e) {
+    console.error('Failed to switch transport:', e);
+  }
+}
+
+// --- Test Loki ---
+async function testLoki() {
+  const el = document.getElementById('test-result');
+  el.className = 'test-result';
+  el.style.display = 'none';
+  el.textContent = 'Testing...';
+  el.style.display = 'block';
+  el.style.background = 'rgba(88,166,255,.1)';
+  el.style.color = 'var(--accent)';
+  el.style.border = '1px solid var(--accent)';
+
+  try {
+    const res = await apiFetch('/api/admin/test-loki', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      el.className = 'test-result success';
+      el.textContent = '✅ Connection successful! (HTTP ' + data.status + ')';
+    } else {
+      el.className = 'test-result fail';
+      el.textContent = '❌ Failed: ' + data.message + (data.status ? ' (HTTP ' + data.status + ')' : '');
+    }
+  } catch (e) {
+    el.className = 'test-result fail';
+    el.textContent = '❌ Network error: ' + e.message;
+  }
+}
+
+// --- Reset Metrics ---
+async function resetMetrics() {
+  if (!confirm('Reset all metrics counters?')) return;
+  await apiFetch('/api/admin/reset-metrics', { method: 'POST' });
+  loadStats();
+}
+
+// --- Helpers ---
+function formatUptime(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// --- Auto refresh ---
+loadStats();
+loadLogs();
+setInterval(loadStats, 5000);
+setInterval(loadLogs, 5000);
+</script>
+</body>
+</html>
