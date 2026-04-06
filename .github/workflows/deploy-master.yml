@@ -179,6 +179,6 @@ jobs:
           # ecosystem.config.js now includes AUTH_USER and AUTH_PASS from GitHub Secrets
           # These env vars are passed through pm2 to the Node.js process
           ssh -i ~/.ssh/deploy_key ${TEST_SERVER_USER}@${TEST_SERVER_HOST} \
-            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipelinemaster\",script:\"src/server.js\",env:{PORT:5001,AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\",LOG_TRANSPORT:\"direct\",LOKI_URL:\"${LOKI_URL}\",LOKI_USER:\"${LOKI_USER}\",LOKI_TOKEN:\"${LOKI_TOKEN}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
+            "cd /var/www/pipelinemaster && npm ci --omit=dev && (pm2 delete pipelinemaster 2>/dev/null || true) && echo 'module.exports={apps:[{name:\"pipelinemaster\",script:\"src/server.js\",env:{PORT:5001,APP_NAME:\"pipelinemaster\",AUTH_USER:\"${AUTH_USER}\",AUTH_PASS:\"${AUTH_PASS}\",LOG_TRANSPORT:\"direct\",LOKI_URL:\"${LOKI_URL}\",LOKI_USER:\"${LOKI_USER}\",LOKI_TOKEN:\"${LOKI_TOKEN}\"}}]}' > ecosystem.config.js && pm2 start ecosystem.config.js && pm2 save"
 
           echo "✅ Master deployed to /var/www/pipelinemaster (port 5001)"

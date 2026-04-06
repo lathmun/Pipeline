@@ -17,7 +17,9 @@ const http = require('http');
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 const TRANSPORTS = ['local', 'direct', 'alloy'];
 
-const APP_NAME = require('../package.json').name;
+const pkg = require('../package.json');
+const APP_NAME = process.env.APP_NAME || pkg.name;
+const APP_VERSION = pkg.version;
 
 class Logger {
   constructor(options = {}) {
@@ -91,6 +93,7 @@ class Logger {
     const testEntry = {
       timestamp: new Date().toISOString(),
       app: APP_NAME,
+      version: APP_VERSION,
       level: 'info',
       message: 'Loki connection test from pipeline admin',
     };
@@ -105,6 +108,7 @@ class Logger {
     const entry = {
       timestamp: new Date().toISOString(),
       app: APP_NAME,
+      version: APP_VERSION,
       level,
       message,
     };
@@ -175,7 +179,7 @@ class Logger {
 
       const payload = JSON.stringify({
         streams: [{
-          stream: { app: APP_NAME, environment: process.env.NODE_ENV || 'development' },
+          stream: { app: APP_NAME, version: APP_VERSION, environment: process.env.NODE_ENV || 'development' },
           values,
         }],
       });
