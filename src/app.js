@@ -23,6 +23,9 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const duration = Date.now() - start;
     metrics.record(req, res, duration);
+    if (duration > 1000) {
+      log.warn('Slow response detected', { method: req.method, url: req.url, durationMs: duration });
+    }
   });
   next();
 });
@@ -88,7 +91,12 @@ app.get('/api/items', basicAuth, (req, res) => {
 
 // GET single item
 app.get('/api/items/:id', basicAuth, (req, res) => {
-  const item = items.find(i => i.id === parseInt(req.params.id, 10));
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    log.warn('Invalid item ID format', { rawId: req.params.id, ip: req.ip });
+    return res.status(400).json({ error: 'INVALID_ID', message: 'Item ID must be a number.' });
+  }
+  const item = items.find(i => i.id === id);
   if (!item) {
     log.debug('Item not found', { id: req.params.id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
@@ -103,6 +111,9 @@ app.post('/api/items', basicAuth, (req, res) => {
     log.debug('Create item rejected: missing name');
     return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'Item name is required. Please provide a name.' });
   }
+  if (name.length > 100) {
+    log.warn('Item name exceeds recommended length', { length: name.length });
+  }
   const item = { id: nextId++, name, description: description || '' };
   items.push(item);
   log.info('Item created', { id: item.id, name: item.name });
@@ -111,7 +122,12 @@ app.post('/api/items', basicAuth, (req, res) => {
 
 // PUT update item
 app.put('/api/items/:id', basicAuth, (req, res) => {
-  const item = items.find(i => i.id === parseInt(req.params.id, 10));
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    log.warn('Invalid item ID format', { rawId: req.params.id, ip: req.ip });
+    return res.status(400).json({ error: 'INVALID_ID', message: 'Item ID must be a number.' });
+  }
+  const item = items.find(i => i.id === id);
   if (!item) {
     log.debug('Update failed: item not found', { id: req.params.id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
@@ -125,7 +141,12 @@ app.put('/api/items/:id', basicAuth, (req, res) => {
 
 // DELETE item
 app.delete('/api/items/:id', basicAuth, (req, res) => {
-  const index = items.findIndex(i => i.id === parseInt(req.params.id, 10));
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    log.warn('Invalid item ID format', { rawId: req.params.id, ip: req.ip });
+    return res.status(400).json({ error: 'INVALID_ID', message: 'Item ID must be a number.' });
+  }
+  const index = items.findIndex(i => i.id === id);
   if (index === -1) {
     log.debug('Delete failed: item not found', { id: req.params.id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
@@ -190,6 +211,24 @@ app.post('/api/admin/reset-metrics', basicAuth, (req, res) => {
   metrics.reset();
   log.info('Metrics reset by admin');
   res.json({ message: 'Metrics reset successfully' });
+});
+
+// --- JSON Parse Error Handler ---
+// Catches malformed JSON in request bodies and logs an error.
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    log.error('Malformed JSON in request body', { method: req.method, url: req.url, ip: req.ip });
+    return res.status(400).json({ error: 'INVALID_JSON', message: 'Request body contains invalid JSON.' });
+  }
+  next(err);
+});
+
+// --- Global Error Handler ---
+// Catches any unhandled errors and logs them at error level.
+// Prevents the server from crashing on unexpected exceptions.
+app.use((err, req, res, next) => {
+  log.error('Unhandled server error', { message: err.message, stack: err.stack, method: req.method, url: req.url });
+  res.status(500).json({ error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' });
 });
 
 // Helper to reset state for tests

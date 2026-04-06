@@ -120,6 +120,9 @@ jobs:
           TEST_SERVER_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}  # SSH private key
           AUTH_USER: ${{ secrets.AUTH_USER }}                  # App auth username
           AUTH_PASS: ${{ secrets.AUTH_PASS }}                  # App auth password
+          LOKI_URL: ${{ secrets.LOKI_URL }}                   # Grafana Loki push URL
+          LOKI_USER: ${{ secrets.LOKI_USER }}                 # Grafana Loki user ID
+          LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}               # Grafana Loki API token
         run: |
           echo "Deploying master to /var/www/pipelinemaster..."
 
