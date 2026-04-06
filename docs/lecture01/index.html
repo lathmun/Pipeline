@@ -142,6 +142,27 @@
   /* SCROLL ANIMATION */
   .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s, transform .6s; }
   .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* TABLE BLOCK (wrapper for ? button) */
+  .table-block { position:relative; margin:16px 0; }
+
+  /* QUESTION SYSTEM */
+  .q-ask-btn { position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--orange); background:var(--surface); color:var(--orange); cursor:pointer; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:10; transition:all .2s; opacity:.7; line-height:1; padding:0; font-family:inherit; }
+  .q-ask-btn:hover { opacity:1; border-color:var(--orange); background:rgba(210,153,34,.2); transform:scale(1.15); }
+  .q-ask-btn.has-questions { opacity:1; background:rgba(210,153,34,.18); border-color:var(--orange); }
+  .q-input-box { background:var(--bg); border:1px solid var(--orange); border-radius:8px; padding:12px; margin-top:12px; position:relative; z-index:20; }
+  .q-input-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:inherit; font-size:14px; resize:vertical; min-height:60px; }
+  .q-input-box textarea:focus { outline:none; border-color:var(--orange); }
+  .q-input-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+  .q-input-actions button { padding:5px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; border:none; }
+  .q-input-actions .q-save-btn { background:var(--orange); color:#0d1117; }
+  .q-input-actions .q-save-btn:hover { background:#e5ac30; }
+  .q-input-actions .q-cancel-btn { background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .q-input-actions .q-cancel-btn:hover { border-color:var(--orange) !important; }
+  .q-saved-list { margin-top:8px; }
+  .q-saved-item { display:flex; gap:8px; align-items:flex-start; padding:5px 10px; background:rgba(210,153,34,.06); border-left:2px solid var(--orange); border-radius:0 6px 6px 0; margin:4px 0; font-size:.82em; }
+  .q-saved-item span:first-child { flex-shrink:0; }
+  .q-saved-text { color:var(--muted); line-height:1.5; }
 </style>
 </head>
 <body>
@@ -238,6 +259,7 @@
 <section class="reveal">
   <h2>⚖️ Key Comparisons</h2>
 
+  <div class="table-block">
   <h3>npm ci vs npm install</h3>
   <table>
     <tr><th>Feature</th><th>npm install</th><th>npm ci</th></tr>
@@ -246,7 +268,9 @@
     <tr><td>Deletes node_modules first</td><td>No</td><td>Yes (clean state)</td></tr>
     <tr><td>Best for</td><td>Local development</td><td>CI/CD pipelines</td></tr>
   </table>
+  </div>
 
+  <div class="table-block">
   <h3>dependencies vs devDependencies</h3>
   <table>
     <tr><th></th><th>dependencies</th><th>devDependencies</th></tr>
@@ -256,7 +280,9 @@
     <tr><td>Skip with</td><td>—</td><td><code>npm ci --omit=dev</code></td></tr>
     <tr><td>Needed on server?</td><td>✅ Yes</td><td>❌ No</td></tr>
   </table>
+  </div>
 
+  <div class="table-block">
   <h3>pm2 restart vs pm2 delete + start</h3>
   <table>
     <tr><th></th><th>pm2 restart</th><th>pm2 delete + start</th></tr>
@@ -265,7 +291,9 @@
     <tr><td>Risk</td><td>Inherits stale/wrong settings</td><td>Clean slate every time ✅</td></tr>
     <tr><td>Best for</td><td>Quick restarts (same config)</td><td>Deployments (config may change)</td></tr>
   </table>
+  </div>
 
+  <div class="table-block">
   <h3>Our Two Deployment Paths</h3>
   <table>
     <tr><th></th><th>Test (Staging)</th><th>Master (Stable)</th></tr>
@@ -276,6 +304,7 @@
     <tr><td>Subdomain</td><td>staging.mytown-online.de</td><td>stable.mytown-online.de</td></tr>
     <tr><td>pm2 name</td><td>pipeline</td><td>pipelinemaster</td></tr>
   </table>
+  </div>
 </section>
 
 <!-- ═══════════ TEST PIPELINE ANIMATION ═══════════ -->
@@ -982,6 +1011,62 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ═══════════ QUESTION SYSTEM ═══════════
+(function(){
+  var LID='lecture01-index',SKEY='user-questions-'+LID;
+  function getQs(){return JSON.parse(localStorage.getItem(SKEY)||'{}');}
+  function saveQ(id,t){var qs=getQs();if(!qs[id])qs[id]=[];qs[id].push({text:t,ts:new Date().toISOString()});localStorage.setItem(SKEY,JSON.stringify(qs));}
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function textId(t){return t.substring(0,40).replace(/[^a-z0-9]/gi,'').toLowerCase();}
+  function showInput(el,id){
+    var ex=el.querySelector('.q-input-box');if(ex){ex.remove();return;}
+    document.querySelectorAll('.q-input-box').forEach(function(b){b.remove();});
+    var box=document.createElement('div');box.className='q-input-box';
+    box.innerHTML='<textarea placeholder="Type your question about this..." rows="2"></textarea><div class="q-input-actions"><button class="q-save-btn">💾 Save</button><button class="q-cancel-btn">✕ Cancel</button></div>';
+    box.addEventListener('click',function(e){e.stopPropagation();});
+    box.querySelector('.q-save-btn').addEventListener('click',function(e){
+      e.stopPropagation();var t=box.querySelector('textarea').value.trim();
+      if(t){saveQ(id,t);box.remove();renderSaved(el,id);updateBtn(el,id);}
+    });
+    box.querySelector('.q-cancel-btn').addEventListener('click',function(e){e.stopPropagation();box.remove();});
+    el.appendChild(box);box.querySelector('textarea').focus();
+  }
+  function renderSaved(el,id){
+    var old=el.querySelector('.q-saved-list');if(old)old.remove();
+    var qs=getQs()[id];if(!qs||!qs.length)return;
+    var list=document.createElement('div');list.className='q-saved-list';
+    list.innerHTML=qs.map(function(q){return '<div class="q-saved-item"><span>💬</span><span class="q-saved-text">'+esc(q.text)+'</span></div>';}).join('');
+    list.addEventListener('click',function(e){e.stopPropagation();});
+    el.appendChild(list);
+  }
+  function updateBtn(el,id){
+    var btn=el.querySelector('.q-ask-btn'),qs=getQs()[id];
+    if(btn&&qs&&qs.length)btn.classList.add('has-questions');
+  }
+  function addBtn(el,id){
+    if(el.querySelector('.q-ask-btn'))return;
+    el.style.position='relative';
+    var btn=document.createElement('button');btn.className='q-ask-btn';btn.textContent='?';btn.title='Ask a question about this';
+    btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();showInput(el,id);});
+    el.appendChild(btn);renderSaved(el,id);updateBtn(el,id);
+  }
+  function inject(){
+    document.querySelectorAll('.concept-card').forEach(function(el,i){addBtn(el,'concept-'+i);});
+    document.querySelectorAll('.explainer-line').forEach(function(el,i){addBtn(el,'explain-'+i);});
+    document.querySelectorAll('.flashcard').forEach(function(el){
+      var t=el.querySelector('.flashcard-front p');
+      addBtn(el,'flash-'+textId(t?t.textContent:''));
+    });
+    document.querySelectorAll('.faq-item').forEach(function(el,i){addBtn(el,'faq-'+i);});
+    document.querySelectorAll('.table-block').forEach(function(el,i){addBtn(el,'table-'+i);});
+    document.querySelectorAll('.pipeline-viz').forEach(function(el,i){addBtn(el,'pipeline-'+i);});
+  }
+  var dt;var mo=new MutationObserver(function(){clearTimeout(dt);dt=setTimeout(inject,150);});
+  if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',function(){mo.observe(document.body,{childList:true,subtree:true});});
+  setTimeout(inject,50);
+})();
 </script>
 
 </body>
