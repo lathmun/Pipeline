@@ -17,9 +17,8 @@ const http = require('http');
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 const TRANSPORTS = ['local', 'direct', 'alloy'];
 
-const pkg = require('../package.json');
-const APP_NAME = process.env.APP_NAME || pkg.name;
-const APP_VERSION = pkg.version;
+const APP_NAME = process.env.APP_NAME || require('../package.json').name;
+const APP_VERSION = require('../public/version.json').version;
 
 class Logger {
   constructor(options = {}) {

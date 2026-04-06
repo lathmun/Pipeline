@@ -86,6 +86,7 @@ let nextId = 2;
 
 // GET all items
 app.get('/api/items', basicAuth, (req, res) => {
+  log.info(`Fetching all items — returning ${items.length} item(s)`);
   res.json(items);
 });
 
@@ -98,9 +99,10 @@ app.get('/api/items/:id', basicAuth, (req, res) => {
   }
   const item = items.find(i => i.id === id);
   if (!item) {
-    log.debug('Item not found', { id: req.params.id });
+    log.warn(`Lookup failed — item with id ${id} does not exist in the list`, { id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
   }
+  log.info(`Fetched item "${item.name}" (id: ${item.id})`);
   res.json(item);
 });
 
@@ -108,15 +110,15 @@ app.get('/api/items/:id', basicAuth, (req, res) => {
 app.post('/api/items', basicAuth, (req, res) => {
   const { name, description } = req.body;
   if (!name) {
-    log.debug('Create item rejected: missing name');
+    log.warn('Creating item failed — name field is missing from request body', { body: req.body });
     return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'Item name is required. Please provide a name.' });
   }
   if (name.length > 100) {
-    log.warn('Item name exceeds recommended length', { length: name.length });
+    log.warn(`Item name is ${name.length} characters — exceeds recommended limit of 100`, { name });
   }
   const item = { id: nextId++, name, description: description || '' };
   items.push(item);
-  log.info('Item created', { id: item.id, name: item.name });
+  log.info(`New item added to the list — "${item.name}" assigned id ${item.id} (total items: ${items.length})`, { id: item.id, name: item.name });
   res.status(201).json(item);
 });
 
@@ -129,13 +131,14 @@ app.put('/api/items/:id', basicAuth, (req, res) => {
   }
   const item = items.find(i => i.id === id);
   if (!item) {
-    log.debug('Update failed: item not found', { id: req.params.id });
+    log.warn(`Update failed — item with id ${id} does not exist in the list`, { id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
   }
   const { name, description } = req.body;
-  if (name !== undefined) item.name = name;
-  if (description !== undefined) item.description = description;
-  log.info('Item updated', { id: item.id });
+  const changes = [];
+  if (name !== undefined) { changes.push(`name: "${item.name}" → "${name}"`); item.name = name; }
+  if (description !== undefined) { changes.push(`description updated`); item.description = description; }
+  log.info(`Item id ${item.id} updated — ${changes.length ? changes.join(', ') : 'no fields changed'}`, { id: item.id, changes });
   res.json(item);
 });
 
@@ -148,11 +151,11 @@ app.delete('/api/items/:id', basicAuth, (req, res) => {
   }
   const index = items.findIndex(i => i.id === id);
   if (index === -1) {
-    log.debug('Delete failed: item not found', { id: req.params.id });
+    log.warn(`Delete failed — item with id ${id} does not exist in the list`, { id });
     return res.status(404).json({ error: 'NOT_FOUND', message: `Item with id ${req.params.id} was not found.` });
   }
   const deleted = items.splice(index, 1);
-  log.info('Item deleted', { id: deleted[0].id });
+  log.info(`Item removed from the list — "${deleted[0].name}" (id: ${deleted[0].id}) deleted (remaining items: ${items.length})`, { id: deleted[0].id, name: deleted[0].name });
   res.json(deleted[0]);
 });
 

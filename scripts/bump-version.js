@@ -119,5 +119,11 @@ versionData.timestamp = now.toISOString();                     // e.g. "2026-04-
 // The trailing \n ensures the file ends with a newline (good practice)
 fs.writeFileSync(versionFile, JSON.stringify(versionData, null, 2) + '\n');
 
+// Also update package.json version to keep it in sync
+const pkgPath = path.join(__dirname, '..', 'package.json');
+const pkgData = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+pkgData.version = versionData.version;
+fs.writeFileSync(pkgPath, JSON.stringify(pkgData, null, 2) + '\n');
+
 // Print confirmation to the console
 console.log(`Version bumped: ${bumpType} → v${versionData.version} (${versionData.date} ${versionData.time})`);
