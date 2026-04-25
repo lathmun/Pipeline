@@ -254,3 +254,45 @@ describe('POST /api/admin/reset-metrics', () => {
     expect(stats.body.authFailures).toBe(0);
   });
 });
+
+describe('Admin polling endpoints excluded from metrics and logs', () => {
+  const log = require('../src/logger');
+
+  test('GET /api/admin/stats is not counted in metrics', async () => {
+    app._resetStore();
+    // Poll stats several times
+    await request(app).get('/api/admin/stats').set('Authorization', AUTH);
+    await request(app).get('/api/admin/stats').set('Authorization', AUTH);
+
+    const res = await request(app).get('/api/admin/stats').set('Authorization', AUTH);
+    // Only non-polling requests should be counted; stats polls must not inflate totalRequests
+    expect(res.body.totalRequests).toBe(0);
+  });
+
+  test('GET /api/admin/logs is not counted in metrics', async () => {
+    app._resetStore();
+    await request(app).get('/api/admin/logs').set('Authorization', AUTH);
+    await request(app).get('/api/admin/logs').set('Authorization', AUTH);
+
+    const res = await request(app).get('/api/admin/stats').set('Authorization', AUTH);
+    expect(res.body.totalRequests).toBe(0);
+  });
+
+  test('GET /api/admin/stats does not produce a log entry', async () => {
+    app._resetStore();
+    const before = log.getRecentLogs(200).length;
+    await request(app).get('/api/admin/stats').set('Authorization', AUTH);
+    const after = log.getRecentLogs(200).length;
+    // No new log entry should have been added for the stats poll
+    expect(after).toBe(before);
+  });
+
+  test('GET /api/admin/logs does not produce a log entry', async () => {
+    app._resetStore();
+    const before = log.getRecentLogs(200).length;
+    await request(app).get('/api/admin/logs').set('Authorization', AUTH);
+    const after = log.getRecentLogs(200).length;
+    // No new log entry should have been added for the logs poll
+    expect(after).toBe(before);
+  });
+});

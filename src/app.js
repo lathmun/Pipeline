@@ -15,10 +15,17 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Paths excluded from request logging and metrics to prevent admin polling
+// from creating a self-referential feedback loop in the log stream and
+// inflating request counters with dashboard traffic.
+const SILENT_PATHS = new Set(['/api/admin/stats', '/api/admin/logs']);
+
 // --- Metrics Middleware ---
 // Tracks response time and status codes for every request.
 // Runs before any route — records when the response finishes.
+// Admin polling endpoints are excluded to keep stats meaningful.
 app.use((req, res, next) => {
+  if (SILENT_PATHS.has(req.path)) return next();
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
@@ -32,8 +39,12 @@ app.use((req, res, next) => {
 
 // --- Request Logger ---
 // Logs every incoming request with method, URL, and timestamp.
+// Admin polling endpoints are excluded to prevent their log entries from
+// appearing in the admin log stream (which would cause a feedback loop).
 app.use((req, res, next) => {
-  log.info(`${req.method} ${req.url}`);
+  if (!SILENT_PATHS.has(req.path)) {
+    log.info(`${req.method} ${req.url}`);
+  }
   next();
 });
 
