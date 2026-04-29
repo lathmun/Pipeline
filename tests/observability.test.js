@@ -7,7 +7,9 @@ describe('Observability & Logging Tests (Agent 3)', () => {
     app._resetStore();
   });
 
-  const auth = Buffer.from('admin:password123').toString('base64');
+  const testUser = process.env.AUTH_USER || 'admin';
+  const testPass = process.env.AUTH_PASS || 'changeme';
+  const auth = Buffer.from(`${testUser}:${testPass}`).toString('base64');
 
   test('REQ-OBS-03: API requests should generate structured logs', async () => {
     // Trigger an API action
